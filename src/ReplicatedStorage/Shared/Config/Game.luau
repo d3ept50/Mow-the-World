@@ -110,7 +110,7 @@ G.Daily = {
 }
 
 ---------------------------------------------------------------- Movement & clicking
-G.Sprint = { mult = 1.4 } -- walk speed multiplier while Shift or Ctrl is held
+G.Sprint = { mult = 1.4 } -- walk speed multiplier while Shift is held
 -- Clicking (or holding the mouse / a touch) makes the mower hit this many times faster.
 -- window = how long one click keeps the boost going, in seconds.
 G.Click = { mult = 2, window = 0.45 }

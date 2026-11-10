@@ -1,5 +1,5 @@
--- Player input that the server acts on: sprint (hold Shift or Ctrl) and click / tap to
--- mow faster. The client only reports "sprinting" or "clicked"; the server decides the
+-- Player input: sprint (hold Shift), click / tap to mow faster, and Ctrl for Roblox's
+-- Shift Lock. The client only reports "sprinting" or "clicked"; the server decides the
 -- walk speed and does all the cutting.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -14,10 +14,10 @@ local Controls = {}
 local SPRINT_KEYS = {
 	[Enum.KeyCode.LeftShift] = true,
 	[Enum.KeyCode.RightShift] = true,
-	[Enum.KeyCode.LeftControl] = true,
-	[Enum.KeyCode.RightControl] = true,
 	[Enum.KeyCode.ButtonL3] = true, -- gamepad: click the left stick
 }
+-- Shift is used for sprinting, so Roblox's Shift Lock (mouse lock) is moved to Ctrl.
+local SHIFT_LOCK_KEYS = "LeftControl,RightControl"
 local BASE_FOV, SPRINT_FOV = 70, 78
 local CLICK_GAP = 0.15 -- seconds between "cut" messages while clicking or holding
 
@@ -50,7 +50,21 @@ local function isPress(input: InputObject): boolean
 	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
 end
 
+-- Roblox's camera scripts read the Shift Lock keys from a StringValue called BoundKeys.
+local function rebindShiftLock()
+	local node: Instance? = Players.LocalPlayer:WaitForChild("PlayerScripts", 10)
+	for _, name in ipairs({ "PlayerModule", "CameraModule", "MouseLockController", "BoundKeys" }) do
+		node = node and node:WaitForChild(name, 10)
+	end
+	if node and node:IsA("StringValue") then
+		node.Value = SHIFT_LOCK_KEYS
+	else
+		warn("[Controls] Could not find the Shift Lock key setting; Shift Lock stays on Shift")
+	end
+end
+
 function Controls.init()
+	task.spawn(rebindShiftLock)
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if SPRINT_KEYS[input.KeyCode] then
 			if not UserInputService:GetFocusedTextBox() then
