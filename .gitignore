@@ -1,0 +1,10 @@
+# Blender backup files
+*.blend1
+# Roblox place lock files and local place saves
+*.rbxl.lock
+*.rbxlx.lock
+# Rojo build output
+/build/
+# OS files
+Thumbs.db
+.DS_Store
