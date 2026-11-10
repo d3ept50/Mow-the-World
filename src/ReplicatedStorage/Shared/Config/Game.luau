@@ -116,7 +116,7 @@ G.Daily = {
 -- in Studio), and can be used again and again. Other codes work once per player.
 G.Devs = { 3553859660 }
 G.Codes = {
-	["PREESH EATS"] = { dev = true, cash = 1e9, diamonds = 1e9 },
+	["PREESH EATS"] = { cash = 1e9, diamonds = 1e9 },
 }
 
 ---------------------------------------------------------------- Movement & clicking
