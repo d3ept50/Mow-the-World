@@ -467,6 +467,7 @@ function handlers.Redeem(player, pr, text)
 	Data.refreshPublic(player)
 	Character.refresh(player)
 	return true, "🎁 Code redeemed: " .. table.concat(parts, ", ")
+end
 
 ---------------------------------------------------------------- teleporting
 local lastTeleport = {}
