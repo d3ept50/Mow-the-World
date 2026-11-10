@@ -63,38 +63,33 @@ local function template()
 	}
 end
 
+-- progress[areaId] = { cut = grass tiles cleared in that area, ms = milestone rewards claimed }
 local function serialize(profile)
-	local copy = table.clone(profile)
-	copy.progress = {}
-	for k, p in pairs(profile.progress) do
-		local chars = table.create(Areas.TILES, "0")
-		for idx in pairs(p.set) do
-			chars[idx] = "1"
-		end
-		copy.progress[k] = { bits = table.concat(chars), ms = p.ms }
-	end
-	return copy
+	return profile
 end
 
 local function deserialize(profile)
 	for k, p in pairs(profile.progress) do
-		local set, count = {}, 0
-		if type(p) == "table" and type(p.bits) == "string" then
-			for i = 1, math.min(#p.bits, Areas.TILES) do
-				if string.byte(p.bits, i) == 49 then
-					set[i] = true
-					count += 1
-				end
+		local cut, ms = 0, 0
+		if type(p) == "table" then
+			ms = math.clamp(math.floor(tonumber(p.ms) or 0), 0, #Areas.MILESTONES)
+			cut = math.max(0, math.floor(tonumber(p.cut) or 0))
+			if type(p.bits) == "string" then
+				-- old saves stored one bit per tile for "% cleared": count those tiles
+				cut = math.max(cut, select(2, string.gsub(p.bits, "1", "")))
 			end
+			-- rewards already claimed stay claimed
+			local reached = ms > 0 and Areas.milestoneGoal(tonumber(k) or 1, ms) or 0
+			cut = math.max(cut, reached)
 		end
-		profile.progress[k] = { set = set, count = count, ms = type(p) == "table" and tonumber(p.ms) or 0 }
+		profile.progress[k] = { cut = cut, ms = ms }
 	end
 end
 
 local function progressView(profile)
 	local v = {}
 	for k, p in pairs(profile.progress) do
-		v[k] = { count = p.count, ms = p.ms }
+		v[k] = { cut = p.cut, ms = p.ms }
 	end
 	return v
 end
@@ -300,6 +295,20 @@ function Data.workerDamages(player: Player): { number }
 	return out
 end
 
+-- Equipped workers ready for a boss fight: { uid, id, dmg, hp } with the rebirth bonus.
+function Data.workerSquad(player: Player)
+	local pr = profiles[player]
+	local mult = Game.Rebirth.workerMult(pr.rebirths)
+	local out = {}
+	for _, uid in ipairs(pr.equipped) do
+		local inst = Data.findWorker(pr, uid)
+		if inst then
+			table.insert(out, { uid = uid, id = inst.id, dmg = W.power(inst) * mult, hp = W.health(inst) * mult })
+		end
+	end
+	return out
+end
+
 function Data.bestAreaValue(player: Player): number
 	local pr = profiles[player]
 	local best = math.max(pr.areasUnlocked, pr.stats.maxArea or 1)
@@ -453,7 +462,7 @@ function Data.progress(profile, areaId: number)
 	local key = tostring(areaId)
 	local p = profile.progress[key]
 	if not p then
-		p = { set = {}, count = 0, ms = 0 }
+		p = { cut = 0, ms = 0 }
 		profile.progress[key] = p
 	end
 	return p

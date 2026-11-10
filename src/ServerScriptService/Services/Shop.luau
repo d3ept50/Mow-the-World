@@ -13,6 +13,7 @@ local Util = require(RS.Shared.Util)
 local Data = require(script.Parent.Data)
 local Crates = require(script.Parent.Crates)
 local Character = require(script.Parent.Character)
+local Boss = require(script.Parent.Boss)
 local Remotes = RS.Remotes
 
 local Shop = {}
@@ -466,6 +467,66 @@ function handlers.Redeem(player, pr, text)
 	Data.refreshPublic(player)
 	Character.refresh(player)
 	return true, "🎁 Code redeemed: " .. table.concat(parts, ", ")
+
+---------------------------------------------------------------- teleporting
+local lastTeleport = {}
+
+-- Jump straight to the marketplace (0) or to any area the player has unlocked.
+function handlers.Teleport(player, pr, areaId)
+	if type(areaId) ~= "number" or areaId % 1 ~= 0 or (areaId ~= 0 and not Areas.List[areaId]) then
+		return fail("Invalid place.")
+	end
+	if areaId > pr.areasUnlocked then
+		return fail("🔒 Unlock " .. Areas.List[areaId].name .. " first.")
+	end
+	if Boss.inFight(player) then
+		return fail("Finish your boss fight first.")
+	end
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 then
+		return fail("You can't teleport right now.")
+	end
+	local now = os.clock()
+	if now - (lastTeleport[player] or 0) < Game.Teleport.cooldown then
+		return fail("Wait a moment before teleporting again.")
+	end
+	lastTeleport[player] = now
+	local pos = Areas.teleportPos(areaId)
+	pcall(function()
+		player:RequestStreamAroundAsync(pos, 3)
+	end)
+	if player.Character ~= char then
+		return fail("You can't teleport right now.")
+	end
+	local center = areaId == 0 and Vector3.zero or Areas.List[areaId].center
+	char:PivotTo(CFrame.lookAt(pos, Vector3.new(center.X, pos.Y, center.Z)))
+	return true, "Teleported to " .. (areaId == 0 and "the Marketplace" or Areas.List[areaId].name) .. "!"
+end
+
+---------------------------------------------------------------- boss fights (see Boss)
+function handlers.BossSolo(player, _pr, areaId)
+	return Boss.solo(player, areaId)
+end
+
+function handlers.BossInvite(player, _pr, areaId)
+	return Boss.invite(player, areaId)
+end
+
+function handlers.BossRespond(player, _pr, hostId, accept)
+	return Boss.respond(player, hostId, accept)
+end
+
+function handlers.BossBegin(player)
+	return Boss.beginNow(player)
+end
+
+function handlers.BossCancel(player)
+	return Boss.cancel(player)
+end
+
+function handlers.BossLeave(player)
+	return Boss.leave(player)
 end
 
 ---------------------------------------------------------------- dispatcher
@@ -512,6 +573,7 @@ function Shop.init()
 	Players.PlayerRemoving:Connect(function(player)
 		buckets[player] = nil
 		lastRedeem[player] = nil
+		lastTeleport[player] = nil
 	end)
 end
 

@@ -92,14 +92,21 @@ function State.workerPower(inst): number
 	return W.power(inst) * Game.Rebirth.workerMult(State.data.rebirths)
 end
 
-function State.progressPct(areaId: number): number
+function State.workerHealth(inst): number
+	return W.health(inst) * Game.Rebirth.workerMult(State.data.rebirths)
+end
+
+-- Grass milestones of an area: tiles cleared, rewards claimed, and the next goal (nil = all done).
+function State.milestone(areaId: number)
 	local p = State.data.progress[tostring(areaId)]
-	return p and math.floor(p.count / Areas.TILES * 100) or 0
+	local cut, ms = p and p.cut or 0, p and p.ms or 0
+	return cut, ms, Areas.milestoneGoal(areaId, ms + 1), ms > 0 and Areas.milestoneGoal(areaId, ms) or 0
 end
 
 function State.action(name: string, ...)
 	local ok, res, msg = pcall(Remotes.Action.InvokeServer, Remotes.Action, name, ...)
 	if not ok then
+		State.notify("⚠️ Couldn't reach the server. Please try again.", "bad")
 		return false
 	end
 	if type(msg) == "string" then

@@ -28,6 +28,7 @@ Menus.titles = {
 	Workers = "👷 Workers", Crates = "📦 Worker Crates", Mowers = "✂️ Mowers", Bags = "🎒 Grass Bags", Vehicles = "🚜 Vehicles",
 	Rebirth = "🔁 Rebirth Shrine", Daily = "🎁 Daily Rewards", Achievements = "🏆 Achievements", Inventory = "🧳 Inventory",
 	Robux = "🛒 Robux Shop", Diamonds = "💎 Diamond Shop", Settings = "⚙️ Settings",
+	Teleport = "🧭 Teleport", More = "☰ Menu",
 }
 
 local function rarityColor(rarityId: string): Color3
@@ -47,6 +48,56 @@ end
 local function areaLocked(areaId: number): boolean
 	local d = State.data
 	return d.areasUnlocked < areaId
+end
+
+---------------------------------------------------------------- menu (everything that is not on the HUD)
+R.More = function(body)
+	local grid = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = body }, { new("UIGridLayout", { CellSize = UDim2.fromOffset(244, 126), CellPadding = UDim2.fromOffset(12, 12), SortOrder = Enum.SortOrder.LayoutOrder, HorizontalAlignment = Enum.HorizontalAlignment.Center }) })
+	for i, m in ipairs(Menus.MORE) do
+		local b = UI.button({ Name = m[3], BackgroundColor3 = Menus.COLORS[m[3]] or T.card, LayoutOrder = i, Corner = 16, Parent = grid }, function()
+			Menus.open(m[3], {})
+		end)
+		UI.text({ Text = m[1], Size = UDim2.new(1, 0, 0, 78), TextXAlignment = CENTER, TextSize = 50, ZIndex = 2, Parent = b })
+		UI.text({ Text = m[2], Position = UDim2.new(0, 0, 1, -40), Size = UDim2.new(1, 0, 0, 30), TextXAlignment = CENTER, TextSize = 22, Outline = true, ZIndex = 2, Parent = b })
+	end
+end
+
+---------------------------------------------------------------- teleport
+R.Teleport = function(body)
+	local d = State.data
+	local here = player:GetAttribute("Area") or 0
+	local fighting = (player:GetAttribute("BossFight") or 0) ~= 0
+	local list = Menus.scroller(body)
+	local function go(areaId)
+		return function()
+			if State.action("Teleport", areaId) then
+				UI.sfx("teleport")
+				Menus.close()
+			end
+		end
+	end
+	local r, icon = Menus.row(list, 86, "Marketplace", "Shops, the Rebirth Shrine and the leaderboards.")
+	r.LayoutOrder = 0
+	Menus.iconText(icon, "🏪")
+	Menus.rowButton(r, here == 0 and "You are here" or "Teleport", T.teal, here ~= 0 and not fighting, go(0))
+	for i, a in ipairs(Areas.List) do
+		local unlocked = i <= d.areasUnlocked
+		local sub
+		if unlocked then
+			local cut, ms = State.milestone(i)
+			sub = "Grass worth <b>$" .. fmt(a.grassValue) .. "</b> each   ·   Boss: <b>" .. a.boss.name .. "</b>" .. (d.bossKills[tostring(i)] and " ✅" or "") .. "\n🌿 " .. fmt(cut) .. " cleared   ·   " .. ms .. "/" .. #Areas.MILESTONES .. " grass rewards"
+		else
+			sub = "🔒 Defeat the <b>" .. Areas.List[i - 1].boss.name .. "</b> in " .. Areas.List[i - 1].name .. " to unlock."
+		end
+		local row, ic = Menus.row(list, 86, a.name, sub, unlocked and a.grass:Lerp(Color3.new(1, 1, 1), 0.35) or T.dim)
+		row.LayoutOrder = i
+		Menus.iconText(ic, unlocked and "🌿" or "🔒", unlocked and a.grass:Lerp(Color3.new(0, 0, 0), 0.35) or nil)
+		if not unlocked then
+			Menus.rowButton(row, "🔒 Locked", T.grey, false)
+		else
+			Menus.rowButton(row, here == i and "You are here" or "Teleport", T.teal, here ~= i and not fighting, go(i))
+		end
+	end
 end
 
 ---------------------------------------------------------------- mowers / bags / vehicles
@@ -178,7 +229,7 @@ R.Workers = function(body, ctx)
 		stroke.Transparency = 0
 		UI.text({ Text = "👷", Size = UDim2.new(1, 0, 0, 36), Position = UDim2.fromOffset(0, 4), TextXAlignment = CENTER, TextSize = 28, Parent = card })
 		UI.text({ Text = def.name, Position = UDim2.fromOffset(4, 40), Size = UDim2.new(1, -8, 0, 30), TextXAlignment = CENTER, TextSize = 12, TextWrapped = true, TextTruncate = Enum.TextTruncate.None, TextColor3 = rc:Lerp(Color3.new(1, 1, 1), 0.4), Parent = card })
-		UI.text({ Text = "⚔️ " .. fmt(State.workerPower(inst)), Position = UDim2.fromOffset(0, 72), Size = UDim2.new(1, 0, 0, 18), TextXAlignment = CENTER, TextSize = 14, Parent = card })
+		UI.text({ Text = "⚔️" .. fmt(State.workerPower(inst)) .. " ❤️" .. fmt(State.workerHealth(inst)), Position = UDim2.fromOffset(0, 72), Size = UDim2.new(1, 0, 0, 18), TextXAlignment = CENTER, TextSize = 12, Parent = card })
 		UI.text({ Text = "Lv " .. inst.lvl .. string.rep("⭐", inst.tier), Position = UDim2.fromOffset(0, 90), Size = UDim2.new(1, 0, 0, 16), TextXAlignment = CENTER, TextSize = 12, TextColor3 = T.dim, Parent = card })
 		local badge = (State.isEquipped(inst.uid) and "✅" or "") .. (inst.locked and "🔒" or "")
 		if badge ~= "" then
@@ -195,7 +246,7 @@ R.Workers = function(body, ctx)
 	local holder = new("Frame", { Position = UDim2.fromOffset(70, 4), Size = UDim2.fromOffset(110, 100), BackgroundTransparency = 1, Parent = pane })
 	UI.viewport("worker", def.id).Parent = holder
 	UI.text({ Text = def.name, Position = UDim2.fromOffset(6, 104), Size = UDim2.new(1, -12, 0, 22), TextXAlignment = CENTER, TextSize = 19, TextColor3 = rc:Lerp(Color3.new(1, 1, 1), 0.3), Parent = pane })
-	UI.text({ Text = def.rarity .. "   ⚔️ " .. fmt(State.workerPower(sel)), Position = UDim2.fromOffset(6, 126), Size = UDim2.new(1, -12, 0, 18), TextXAlignment = CENTER, TextSize = 15, TextColor3 = rc, Parent = pane })
+	UI.text({ Text = def.rarity .. "   ⚔️ " .. fmt(State.workerPower(sel)) .. "   ❤️ " .. fmt(State.workerHealth(sel)), Position = UDim2.fromOffset(6, 126), Size = UDim2.new(1, -12, 0, 18), TextXAlignment = CENTER, TextSize = 15, TextColor3 = rc, Parent = pane })
 	UI.text({ Text = "Level " .. sel.lvl .. "/" .. W.MAX_LEVEL .. "    Stars " .. sel.tier .. "/" .. W.MAX_TIER, Position = UDim2.fromOffset(6, 145), Size = UDim2.new(1, -12, 0, 18), TextXAlignment = CENTER, TextSize = 14, TextColor3 = T.dim, Parent = pane })
 	local y = 168
 	local function btn(text, color, enabled, fn)
@@ -643,8 +694,9 @@ R.Settings = function(body)
 	toggle(2, "Sound effects", "Mowing, selling and reward sounds.", UI.settings.sfx, local_("sfx"))
 	toggle(3, "Visual effects", "Grass particles, floating numbers and confetti.", UI.settings.effects, local_("effects"))
 	toggle(4, "Show other players' workers", "Turn off for better performance on slow devices.", UI.settings.otherWorkers, local_("otherWorkers"))
+	toggle(5, "Guide arrow", "The arrow over your head that points to the next area or the nearest place to sell.", UI.settings.arrow, local_("arrow"))
 	local hasAuto = d.perks.autoSell or State.hasPass("AutoSell")
-	toggle(5, "Auto Sell", hasAuto and "Sell automatically when your bag is full." or "Unlock in the 💎 Diamond Shop or 🛒 Robux Shop.", hasAuto and d.settings.autoSell ~= false, function()
+	toggle(6, "Auto Sell", hasAuto and "Sell automatically when your bag is full." or "Unlock in the 💎 Diamond Shop or 🛒 Robux Shop.", hasAuto and d.settings.autoSell ~= false, function()
 		State.action("Setting", "autoSell", d.settings.autoSell == false)
 	end, hasAuto)
 

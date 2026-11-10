@@ -60,20 +60,21 @@ local function canAutoSell(player, pr)
 	return (pr.perks.autoSell or Data.hasPass(player, "AutoSell")) and pr.settings.autoSell ~= false
 end
 
+-- Rewards for clearing a set amount of grass in an area (see Areas.MILESTONES).
 local function milestones(player, pr, areaId, p)
 	local a = Areas.List[areaId]
-	local pct = p.count / TILES * 100
-	while p.ms < #Areas.MILESTONES and pct >= Areas.MILESTONES[p.ms + 1] do
+	local count = #Areas.MILESTONES
+	while p.ms < count and p.cut >= Areas.milestoneGoal(areaId, p.ms + 1) do
 		p.ms += 1
 		local cash = math.floor(Areas.MILESTONE_CASH[p.ms] * a.grassValue * Data.cashMult(player))
 		Data.addCash(player, cash, true)
 		local text = "+$" .. Util.fmt(cash)
-		if p.ms == #Areas.MILESTONES and crateForArea then
+		if p.ms == count and crateForArea then
 			local crateId = crateForArea(areaId)
 			Data.addCrate(player, crateId, 1)
 			text ..= " + " .. crateId .. " Crate"
 		end
-		Remotes.Milestone:FireClient(player, areaId, Areas.MILESTONES[p.ms], text)
+		Remotes.Milestone:FireClient(player, areaId, Areas.milestoneGoal(areaId, p.ms), text)
 	end
 end
 
@@ -105,10 +106,9 @@ local function cut(player, pr, areaId, idx, eff)
 		Data.addStat(player, "grassCut", units)
 	end
 	local p = Data.progress(pr, areaId)
-	if not p.set[idx] then
-		p.set[idx] = true
-		p.count += 1
-		d.progress = true
+	p.cut += 1
+	d.progress = true
+	if p.ms < #Areas.MILESTONES then
 		milestones(player, pr, areaId, p)
 	end
 	for _, cb in ipairs(cutCallbacks) do
@@ -252,13 +252,16 @@ local function step()
 		if pr and hrp and hum and hum.Health > 0 then
 			local pos = hrp.Position
 			local areaId = Areas.at(pos)
-			if player:GetAttribute("Area") ~= (areaId or -1) then
-				player:SetAttribute("Area", areaId or -1)
+			local bossArea = player:GetAttribute("BossArea") or 0
+			-- in a boss arena the player still counts as being in that boss's area
+			local shown = bossArea > 0 and bossArea or areaId or -1
+			if player:GetAttribute("Area") ~= shown then
+				player:SetAttribute("Area", shown)
 			end
 			if pr.bagCount > 0 and nearSell(pos, areaId) then
 				Grass.sell(player)
 			end
-			if areaId and areaId >= 1 and areaId <= pr.areasUnlocked and (player:GetAttribute("BossArea") or 0) == 0 then
+			if areaId and areaId >= 1 and areaId <= pr.areasUnlocked and bossArea == 0 then
 				local full = bagFull(player, pr) and handleFull(player, pr, now)
 				if not full then
 					if now >= (nextHit[player] or 0) then

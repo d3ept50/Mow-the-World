@@ -238,6 +238,82 @@ local function pickTile(areaId, pos, taken)
 	return best
 end
 
+-- The boss model of the fight a player is in (nil when they are not fighting).
+local function fightModel(plr)
+	local id = plr:GetAttribute("BossFight") or 0
+	local folder = id ~= 0 and workspace:FindFirstChild("Bosses")
+	return folder and folder:FindFirstChild("F" .. id) or nil
+end
+
+-- Worker health in a boss fight arrives as "100,40,0": percent per equipped worker.
+local function workerHealth(plr, r)
+	local str = plr:GetAttribute("WorkerHP")
+	if str ~= r.hpStr then
+		r.hpStr = str
+		r.hp = {}
+		if type(str) == "string" then
+			for n in string.gmatch(str, "%d+") do
+				table.insert(r.hp, tonumber(n))
+			end
+		end
+	end
+	return r.hp
+end
+
+local function healthBar(it)
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "Health"
+	bb.Size = UDim2.fromScale(3.4, 0.5)
+	bb.StudsOffsetWorldSpace = V(0, 5.2, 0)
+	bb.AlwaysOnTop = true
+	bb.LightInfluence = 0
+	bb.MaxDistance = 140
+	bb.Adornee = it.model.PrimaryPart
+	local back = Instance.new("Frame")
+	back.Size = UDim2.fromScale(1, 1)
+	back.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+	back.BorderSizePixel = 0
+	back.Parent = bb
+	Instance.new("UICorner", back).CornerRadius = UDim.new(0.5, 0)
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.fromScale(1, 1)
+	fill.BackgroundColor3 = Color3.fromRGB(90, 220, 110)
+	fill.BorderSizePixel = 0
+	fill.Parent = back
+	Instance.new("UICorner", fill).CornerRadius = UDim.new(0.5, 0)
+	local text = Instance.new("TextLabel")
+	text.Size = UDim2.fromScale(1, 1)
+	text.BackgroundTransparency = 1
+	text.Font = Enum.Font.FredokaOne
+	text.TextScaled = true
+	text.TextColor3 = Color3.new(1, 1, 1)
+	text.TextStrokeTransparency = 0.3
+	text.Text = ""
+	text.ZIndex = 2
+	text.Parent = back
+	bb.Parent = it.model
+	it.bar, it.barFill, it.barText = bb, fill, text
+end
+
+local function setHealthBar(it, pct: number?)
+	if pct == nil then
+		if it.bar then
+			it.bar:Destroy()
+			it.bar, it.barFill, it.barText, it.pct = nil, nil, nil, nil
+		end
+		return
+	end
+	if not it.bar then
+		healthBar(it)
+	end
+	if it.pct ~= pct then
+		it.pct = pct
+		it.barFill.Size = UDim2.fromScale(pct / 100, 1)
+		it.barFill.BackgroundColor3 = pct > 50 and Color3.fromRGB(90, 220, 110) or pct > 20 and Color3.fromRGB(255, 200, 60) or Color3.fromRGB(240, 80, 80)
+		it.barText.Text = pct <= 0 and "💫 KO" or ""
+	end
+end
+
 local function syncWorkers(plr)
 	local json = plr:GetAttribute("Workers") or "[]"
 	if plr ~= player and not UI.settings.otherWorkers then
@@ -273,7 +349,8 @@ local function animateWorkers(t, dt)
 		local n = #r.items
 		if hrp and n > 0 then
 			local ground = hrp.Position.Y - 3
-			local bossArea = plr:GetAttribute("BossArea") or 0
+			local boss = fightModel(plr)
+			local hp = boss and workerHealth(plr, r)
 			local area = plr:GetAttribute("Area") or 0
 			local canMow = area >= 1 and (plr ~= player or area <= State.data.areasUnlocked)
 			local taken = {}
@@ -284,14 +361,29 @@ local function animateWorkers(t, dt)
 			end
 			for i, it in ipairs(r.items) do
 				local goal, look, working
-				if bossArea > 0 then
-					local a = Areas.List[bossArea]
-					local ang = (i / n) * math.pi * 2 + t * 0.35
-					local rad = a.boss.size * 0.6 + 4
-					goal = a.bossPos + V(math.sin(ang) * rad, 0.7, math.cos(ang) * rad)
-					look = a.bossPos
-					working = true
+				local down = false
+				setHealthBar(it, hp and (hp[i] or 100) or nil)
+				if boss and boss.PrimaryPart then
+					-- surround the boss wherever it walks; knocked out workers stay where they fell
+					local a = Areas.List[boss:GetAttribute("Area") or 0] or Areas.List[1]
+					local centre = boss:GetAttribute("Pos") or boss.PrimaryPart.Position
+					local bp = boss.PrimaryPart.Position
+					bp = V(bp.X, centre.Y + 0.2, bp.Z)
+					down = hp[i] == 0
+					if down and it.pos then
+						goal = it.pos
+					else
+						local ang = (i / n) * math.pi * 2 + t * 0.35
+						local rad = a.boss.size * 0.6 + 5
+						goal = bp + V(math.sin(ang) * rad, 0, math.cos(ang) * rad)
+					end
+					look = bp
+					working = not down
 					it.tile = nil
+				elseif plr:GetAttribute("BossFight") and plr:GetAttribute("BossFight") ~= 0 then
+					-- the fight is ending: wait beside the player
+					goal = V(hrp.Position.X + (i - (n + 1) / 2) * 3.4, ground, hrp.Position.Z + 5)
+					look = hrp.Position
 				else
 					if canMow then
 						if not it.tile or it.tile.Transparency >= 1 or t > it.retarget then
@@ -335,7 +427,9 @@ local function animateWorkers(t, dt)
 				local flat = V(face.X, it.pos.Y, face.Z)
 				local cf = (flat - it.pos).Magnitude > 0.2 and CFrame.lookAt(it.pos, flat) or CF(it.pos)
 				local hop = 0
-				if moving then
+				if down then
+					cf *= CF(0, 0.7, 0) * ANG(0, 0, math.rad(90)) -- lying on its side
+				elseif moving then
 					hop = math.abs(math.sin((t + it.phase) * 10)) * 0.7
 				elseif working then
 					hop = math.abs(math.sin((t + it.phase) * 9)) * 0.3
@@ -399,8 +493,9 @@ local function connectRemotes()
 
 	Remotes.Milestone.OnClientEvent:Connect(function(areaId, pct, text)
 		local a = Areas.List[areaId]
-		Menus.banner(a.name .. " " .. pct .. "% cleared!", a.grass:Lerp(Color3.new(1, 1, 1), 0.3))
-		Menus.notify("🌿 " .. pct .. "% milestone reward: " .. text, "big")
+		-- pct is now the number of grass tiles the reward was for
+		Menus.banner(fmt(pct) .. " grass cleared!", a.grass:Lerp(Color3.new(1, 1, 1), 0.3))
+		Menus.notify("🌿 " .. a.name .. " reward: " .. text, "big")
 		Menus.confetti()
 	end)
 
@@ -421,30 +516,64 @@ local function connectRemotes()
 	end)
 
 	local lastDmg, pendingDmg = 0, 0
+	local RED = Color3.fromRGB(255, 90, 90)
+	-- where the boss of a fight is right now, and how big it is
+	local function bossAt(areaId, fightId)
+		local folder = workspace:FindFirstChild("Bosses")
+		local model = folder and folder:FindFirstChild("F" .. tostring(fightId))
+		local root = model and model.PrimaryPart
+		return root and root.Position or nil, Areas.List[areaId].boss.size
+	end
 	Remotes.BossFx.OnClientEvent:Connect(function(kind, areaId, a1, a2, a3, a4)
 		local a = Areas.List[areaId]
 		if not a then
 			return
 		end
-		if kind == "start" then
-			Menus.banner("⚔️ " .. a.boss.name .. "!", Color3.fromRGB(255, 90, 90))
-			Menus.notify("Stay close to the boss so your mower hits it — and dodge the red circles!", "info")
+		if kind == "invite" then
+			Menus.showInvite(areaId, a1, a2, a3)
+		elseif kind == "lobby" then
+			Menus.setLobby(areaId, a1, a2, a3)
+		elseif kind == "lobbyEnd" then
+			if a1 == player.UserId then
+				Menus.setLobby(nil)
+			else
+				Menus.endInvite(a1)
+			end
+		elseif kind == "start" then
+			Menus.close()
+			Menus.setLobby(nil)
+			Menus.endInvite(nil)
+			Menus.banner("⚔️ " .. a.boss.name .. "!", RED)
+			Menus.notify("Your workers fight for you. Stay close to the boss so your mower hits it too!", "info")
+			UI.sfx("teleport")
 			UI.sfx("boss")
 		elseif kind == "dmg" then
-			pendingDmg += a1
+			pendingDmg += a2
 			if os.clock() - lastDmg > 0.3 then
 				lastDmg = os.clock()
-				local s = a.boss.size
-				floatText(a.bossPos + V(rng:NextNumber(-s, s) * 0.5, s * 1.2, rng:NextNumber(-s, s) * 0.5), "-" .. fmt(pendingDmg), Color3.fromRGB(255, 110, 110), 8)
-				burst(a.bossPos + V(0, s * 0.7, 0), a.boss.color2, 10)
-				UI.sfx("hit", rng:NextNumber(0.9, 1.2), 0.25)
+				local pos, s = bossAt(areaId, a1)
+				if pos then
+					floatText(pos + V(rng:NextNumber(-s, s) * 0.5, s * 0.9, rng:NextNumber(-s, s) * 0.5), "-" .. fmt(pendingDmg), Color3.fromRGB(255, 110, 110), 8)
+					burst(pos + V(0, s * 0.3, 0), a.boss.color2, 10)
+					UI.sfx("hit", rng:NextNumber(0.9, 1.2), 0.25)
+				end
 				pendingDmg = 0
 			end
-		elseif kind == "attack" then
-			local pos, radius, delay = a2, a3, a4
-			if not near(pos, 220) then
+		elseif kind == "move" then
+			-- the boss announces an attack: a1 = fight, a2 = attack name, a3 = where, a4 = warning time
+			local move = Areas.Moves[a2]
+			local pos, delay = a3, a4
+			if not move or not near(pos, 260) then
 				return
 			end
+			local s = a.boss.size
+			floatText(pos + V(0, s * 1.9, 0), move.icon .. " " .. move.label, move.rage and Color3.fromRGB(255, 170, 60) or RED, 13)
+			if move.rule == "none" then
+				UI.sfx("boss", 0.7)
+				burst(pos + V(0, s, 0), Color3.fromRGB(255, 140, 40), 60)
+				return
+			end
+			local radius = s * 0.6 + ((move.rule == "all" or move.rule == "half") and 15 or 9)
 			local ring = Instance.new("Part")
 			ring.Shape = Enum.PartType.Cylinder
 			ring.Anchored = true
@@ -452,19 +581,36 @@ local function connectRemotes()
 			ring.CanQuery = false
 			ring.Material = Enum.Material.Neon
 			ring.Color = Color3.fromRGB(255, 50, 50)
-			ring.Transparency = 0.75
+			ring.Transparency = 0.8
 			ring.Size = V(0.3, radius * 2, radius * 2)
-			ring.CFrame = CF(pos + V(0, 0.2, 0)) * ANG(0, 0, math.rad(90))
+			ring.CFrame = CF(pos + V(0, 0.25, 0)) * ANG(0, 0, math.rad(90))
 			ring.Parent = workspace
-			TweenService:Create(ring, TweenInfo.new(delay, Enum.EasingStyle.Linear), { Transparency = 0.25 }):Play()
-			task.delay(delay, function()
-				burst(pos + V(0, 1, 0), Color3.fromRGB(255, 120, 60), 60)
-				UI.sfx("boss", 1.3)
+			TweenService:Create(ring, TweenInfo.new(delay, Enum.EasingStyle.Linear), { Transparency = 0.3 }):Play()
+			task.delay(delay + 0.2, function()
+				burst(ring.Position + V(0, 1, 0), Color3.fromRGB(255, 120, 60), 50)
+				UI.sfx("boss", 1.3, 0.15)
 				ring:Destroy()
 			end)
+		elseif kind == "hurt" then
+			-- a2 = list of { i = worker number, dmg, ko } for my own workers
+			local mine = rendered[player]
+			for _, h in ipairs(a2) do
+				local it = mine and mine.items[h.i]
+				local pos = it and it.pos
+				if pos then
+					floatText(pos + V(0, 4, 0), "-" .. fmt(h.dmg), Color3.fromRGB(255, 150, 150), 4.5)
+					burst(pos + V(0, 2, 0), RED, 12)
+					if h.ko then
+						floatText(pos + V(0, 6, 0), "💫 Knocked out!", Color3.fromRGB(255, 220, 90), 8)
+					end
+				end
+				if h.ko then
+					UI.sfx("ko", 1, 0.2)
+				end
+			end
 		elseif kind == "defeat" then
-			local pos = a1
-			if near(pos, 250) then
+			local pos = a2
+			if near(pos, 300) then
 				for i = 1, 6 do
 					task.delay(i * 0.2, burst, pos + V(rng:NextNumber(-6, 6), rng:NextNumber(-3, 6), rng:NextNumber(-6, 6)), Color3.fromHSV(rng:NextNumber(), 0.7, 1), 60)
 				end
@@ -473,8 +619,10 @@ local function connectRemotes()
 			Menus.banner("🏆 VICTORY!", Color3.fromRGB(255, 215, 80))
 			Menus.confetti()
 		elseif kind == "fail" then
-			Menus.banner("The boss wins this time...", Color3.fromRGB(255, 90, 90))
-			Menus.notify("Upgrade your mower and workers, then try again!", "info")
+			Menus.banner("The boss wins this time...", RED)
+			Menus.notify("Level up your workers and upgrade your mower, then try again!", "info")
+		elseif kind == "left" then
+			Menus.notify("You left the boss fight.", "info")
 		end
 	end)
 end
@@ -590,7 +738,7 @@ local function updateGuide(t)
 	local head = char and char:FindFirstChild("Head")
 	local d = State.data
 	local target, color
-	if head and UI.settings.arrow then
+	if head and UI.settings.arrow and (player:GetAttribute("BossFight") or 0) == 0 then
 		local pos = head.Position
 		if d.bagCount > 0 and d.bagCount >= State.bagCapacity() - 0.001 then
 			target, color = nearestSell(pos, d.areasUnlocked), GUIDE_RED
@@ -704,6 +852,24 @@ function World.init()
 
 	connectRemotes()
 	startGuide()
+
+	-- Stepping into a boss's circle opens the fight prompt (Solo / Invite friends / Exit).
+	task.spawn(function()
+		while true do
+			task.wait(0.2)
+			local zone
+			local pos = myPos()
+			local area = player:GetAttribute("Area") or 0
+			local a = Areas.List[area]
+			if pos and a and area <= State.data.areasUnlocked and (player:GetAttribute("BossFight") or 0) == 0 then
+				local dx, dz = pos.X - a.bossPos.X, pos.Z - a.bossPos.Z
+				if dx * dx + dz * dz <= Areas.BOSS_ZONE ^ 2 then
+					zone = area
+				end
+			end
+			Menus.setBossZone(zone)
+		end
+	end)
 
 	ProximityPromptService.PromptTriggered:Connect(function(prompt, who)
 		if who ~= player then
