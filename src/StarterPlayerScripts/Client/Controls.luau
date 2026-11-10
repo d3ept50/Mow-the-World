@@ -146,6 +146,10 @@ function Controls.init()
 			if not UserInputService:GetFocusedTextBox() then
 				setLock(not locked)
 			end
+		elseif input.KeyCode == Menus.RIDE_KEY then
+			if not UserInputService:GetFocusedTextBox() and not Menus.isOpen() then
+				task.spawn(Menus.toggleRide) -- the server call waits, so don't hold up input
+			end
 		elseif isPress(input) and not processed then
 			pressing += 1
 			sendCut()

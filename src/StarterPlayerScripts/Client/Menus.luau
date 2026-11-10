@@ -157,6 +157,17 @@ function Menus.close()
 	body:ClearAllChildren()
 end
 
+-- The keyboard key that does the same as pressing the Ride button.
+Menus.RIDE_KEY = Enum.KeyCode.J
+
+-- Gets on or off the equipped vehicle, if the player has one (the Ride button is showing).
+function Menus.toggleRide()
+	if refs.ride and refs.ride.Visible then
+		UI.sfx("click")
+		State.action("ToggleRide")
+	end
+end
+
 function Menus.isOpen(name: string?): boolean
 	return current ~= nil and (name == nil or current.name == name)
 end
@@ -238,6 +249,9 @@ local function buildHUD()
 	refs.ride = UI.button({ Text = "🚜\nRide", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0.5, 212, 1, -12), Size = UDim2.fromOffset(72, 66), TextSize = 16, BackgroundColor3 = T.blue, Visible = false, Parent = root }, function()
 		State.action("ToggleRide")
 	end)
+	-- key hint badge on the corner of the Ride button
+	local key = new("Frame", { Name = "Key", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 6, 0, -6), Size = UDim2.fromOffset(24, 24), BackgroundColor3 = T.ink, ZIndex = 3, Parent = refs.ride }, { UI.corner(7), UI.stroke(T.text, 1.5) })
+	UI.text({ Text = Menus.RIDE_KEY.Name, Size = UDim2.fromScale(1, 1), TextXAlignment = CENTER, TextSize = 15, ZIndex = 4, Parent = key })
 
 	local top = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 6), Size = UDim2.fromOffset(520, 56), BackgroundTransparency = 1, Parent = root })
 	refs.area = UI.text({ Size = UDim2.new(1, 0, 0, 32), TextXAlignment = CENTER, TextSize = 30, Outline = true, Parent = top })
