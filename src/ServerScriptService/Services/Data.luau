@@ -58,6 +58,7 @@ local function template()
 		titles = {},
 		title = "",
 		settings = { autoSell = true },
+		codes = {}, -- [code] = true once a one-time code has been used
 		receipts = {},
 	}
 end

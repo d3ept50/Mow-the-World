@@ -109,6 +109,16 @@ G.Daily = {
 	{ kind = "diamonds", amount = 40, label = "40 Diamonds + Title", title = "Dedicated" },
 }
 
+---------------------------------------------------------------- Codes
+-- Typed into the Codes box in Settings. Capital letters and extra spaces don't matter.
+-- Rewards: cash, diamonds.
+-- dev = true: only works for the Roblox user ids in G.Devs (and for anyone play-testing
+-- in Studio), and can be used again and again. Other codes work once per player.
+G.Devs = { 3553859660 }
+G.Codes = {
+	["PREESH EATS"] = { dev = true, cash = 1e9, diamonds = 1e9 },
+}
+
 ---------------------------------------------------------------- Movement & clicking
 G.Speed = { mult = 1.3 } -- multiplies all movement: walking (base 20) and every vehicle
 G.Sprint = { mult = 1.4 } -- walk speed multiplier while Shift is held

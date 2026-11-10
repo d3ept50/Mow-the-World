@@ -1,6 +1,7 @@
 -- Every client request goes through the single "Action" RemoteFunction handled here.
 -- Each handler validates its arguments, ownership, prices and location on the server.
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local RS = game:GetService("ReplicatedStorage")
 
 local Config = RS.Shared.Config
@@ -407,6 +408,48 @@ function handlers.Setting(player, pr, key, value)
 	return true
 end
 
+---------------------------------------------------------------- codes
+local lastRedeem = {}
+
+function handlers.Redeem(player, pr, text)
+	if type(text) ~= "string" or #text > 40 then
+		return fail("That code doesn't exist.")
+	end
+	local now = os.clock()
+	if now - (lastRedeem[player] or 0) < 1.5 then
+		return fail("Wait a moment before trying another code.")
+	end
+	lastRedeem[player] = now
+	-- capitals and extra spaces don't matter
+	local key = string.upper(text):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")
+	local code = Game.Codes[key]
+	if not code then
+		return fail("That code doesn't exist.")
+	end
+	if code.dev then
+		if not RunService:IsStudio() and not table.find(Game.Devs, player.UserId) then
+			return fail("That code doesn't exist.")
+		end
+	else
+		pr.codes = pr.codes or {}
+		if pr.codes[key] then
+			return fail("You have already used that code.")
+		end
+		pr.codes[key] = true
+	end
+	local parts = {}
+	if code.cash then
+		Data.addCash(player, code.cash)
+		table.insert(parts, "+$" .. Util.fmt(code.cash))
+	end
+	if code.diamonds then
+		Data.addDiamonds(player, code.diamonds)
+		table.insert(parts, "+" .. Util.fmt(code.diamonds) .. " 💎")
+	end
+	Data.sync(player, "cash", "diamonds")
+	return true, "🎁 Code redeemed: " .. table.concat(parts, " and ")
+end
+
 ---------------------------------------------------------------- dispatcher
 local function allowed(player)
 	local now = os.clock()
@@ -450,6 +493,7 @@ function Shop.init()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		buckets[player] = nil
+		lastRedeem[player] = nil
 	end)
 end
 
