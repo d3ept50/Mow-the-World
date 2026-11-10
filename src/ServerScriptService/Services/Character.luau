@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
 local Models = require(RS.Shared.Models)
+local Game = require(RS.Shared.Config.Game)
 local Data = require(script.Parent.Data)
 
 local Character = {}
@@ -59,6 +60,9 @@ function Character.updateSpeed(player: Player)
 	end
 	local v = Data.ridingVehicle(player)
 	local speed = (v and v.speed or 20) * (Data.boost(pr, "speed") and 1.5 or 1)
+	if player:GetAttribute("Sprinting") then
+		speed *= Game.Sprint.mult
+	end
 	if math.abs(hum.WalkSpeed - speed) > 0.01 then
 		hum.WalkSpeed = speed
 	end
@@ -102,6 +106,7 @@ function Character.init()
 	local function onPlayer(player)
 		player:SetAttribute("Riding", false)
 		player:SetAttribute("BossArea", 0)
+		player:SetAttribute("Sprinting", false)
 		local function onChar(char)
 			player:SetAttribute("Riding", false)
 			char:WaitForChild("HumanoidRootPart", 10)
@@ -128,6 +133,12 @@ function Character.init()
 	end
 	Data.onLoaded(function(player)
 		Character.refresh(player)
+	end)
+	RS.Remotes.Input.OnServerEvent:Connect(function(player, kind, on)
+		if kind == "sprint" then
+			player:SetAttribute("Sprinting", on == true)
+			Character.updateSpeed(player)
+		end
 	end)
 	task.spawn(function()
 		while true do

@@ -109,6 +109,12 @@ G.Daily = {
 	{ kind = "diamonds", amount = 40, label = "40 Diamonds + Title", title = "Dedicated" },
 }
 
+---------------------------------------------------------------- Movement & clicking
+G.Sprint = { mult = 1.4 } -- walk speed multiplier while Shift or Ctrl is held
+-- Clicking (or holding the mouse / a touch) makes the mower hit this many times faster.
+-- window = how long one click keeps the boost going, in seconds.
+G.Click = { mult = 2, window = 0.45 }
+
 ---------------------------------------------------------------- Sounds
 G.Sounds = {
 	music = "rbxassetid://113283307098724",

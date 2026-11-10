@@ -5,6 +5,7 @@ local RunService = game:GetService("RunService")
 local RS = game:GetService("ReplicatedStorage")
 
 local Areas = require(RS.Shared.Config.Areas)
+local Game = require(RS.Shared.Config.Game)
 local Util = require(RS.Shared.Util)
 local Data = require(script.Parent.Data)
 local Remotes = RS.Remotes
@@ -16,6 +17,8 @@ local SELL_RANGE = 9
 local state = {} -- [areaId] = { hp, alive, parts, queue, head }
 local cutCallbacks = {}
 local nextHit = {}
+local lastHit = {}
+local clickUntil = {} -- [player] = time the click boost runs out
 local nextWorker = {}
 local lastFullWarn = {}
 local fxBatch = {}
@@ -255,7 +258,9 @@ local function step()
 				if not full then
 					if now >= (nextHit[player] or 0) then
 						local s = Data.mowStats(player)
-						nextHit[player] = now + 1 / s.speed
+						local mult = (clickUntil[player] or 0) > now and Game.Click.mult or 1
+						nextHit[player] = now + 1 / (s.speed * mult)
+						lastHit[player] = now
 						mowerHit(player, pr, areaId, pos, s)
 					end
 					if now >= (nextWorker[player] or 0) then
@@ -327,7 +332,18 @@ function Grass.init()
 			step()
 		end
 	end)
+	-- A click never says what was cut: it only shortens the wait until this player's next hit.
+	Remotes.Input.OnServerEvent:Connect(function(player, kind)
+		if kind ~= "cut" or not Data.get(player) then
+			return
+		end
+		clickUntil[player] = os.clock() + Game.Click.window
+		local boosted = (lastHit[player] or 0) + 1 / (Data.mowStats(player).speed * Game.Click.mult)
+		nextHit[player] = math.min(nextHit[player] or 0, boosted)
+	end)
 	Players.PlayerRemoving:Connect(function(player)
+		lastHit[player] = nil
+		clickUntil[player] = nil
 		nextHit[player] = nil
 		nextWorker[player] = nil
 		lastFullWarn[player] = nil

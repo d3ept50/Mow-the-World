@@ -484,6 +484,95 @@ end
 ---------------------------------------------------------------- init
 local SHOP_PANEL = { Mowers = "Mowers", Bags = "Bags", Crates = "Crates", Vehicles = "Vehicles", Rebirth = "Rebirth", Diamonds = "Diamonds", Robux = "Robux" }
 
+---------------------------------------------------------------- new player guide arrow
+-- Brand-new players get an arrow over their head that points the way to the first area.
+-- It leads to the start of the bridge first, then across it, and goes away on arrival.
+local guide -- { model, parts = { { part, offset } }, goal, bridgeStart, lastLook }
+
+local function findBridgeStart()
+	for _, g in ipairs(CollectionService:GetTagged("Gate")) do
+		if g:GetAttribute("Area") == 1 then
+			-- the gate is thin along the bridge; the bridge runs from it back towards the market
+			local gp = g.Position
+			if g.Size.X < g.Size.Z then
+				return V(gp.X - math.sign(gp.X) * Areas.GAP, 0, gp.Z)
+			end
+			return V(gp.X, 0, gp.Z - math.sign(gp.Z) * Areas.GAP)
+		end
+	end
+	return nil
+end
+
+local function startGuide()
+	local d = State.data
+	local cutSoFar = d.stats and d.stats.grassCut or 0
+	if d.areasUnlocked > 1 or d.rebirths > 0 or cutSoFar > 0 then
+		return
+	end
+	local model = Instance.new("Model")
+	model.Name = "GuideArrow"
+	local function piece(size, offset)
+		local p = Instance.new("Part")
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		p.Material = Enum.Material.Neon
+		p.Color = Color3.fromRGB(120, 255, 90)
+		p.Size = size
+		p.Parent = model
+		return { p, offset }
+	end
+	-- the arrow points along -Z: a shaft plus two arms that meet at the tip
+	local tip = V(0, 0, -2.2)
+	local parts = { piece(V(0.7, 0.45, 2.6), CF(0, 0, -0.6)) }
+	for _, side in ipairs({ -1, 1 }) do
+		local dir = V(side * math.sin(math.rad(42)), 0, math.cos(math.rad(42)))
+		local c = tip + dir
+		table.insert(parts, piece(V(0.7, 0.45, 2.2), CFrame.lookAt(c, c + dir)))
+	end
+	model.Parent = workspace
+	guide = { model = model, parts = parts, goal = Areas.List[1].center, bridgeStart = findBridgeStart(), lastLook = 0 }
+end
+
+local function updateGuide(t)
+	if not guide then
+		return
+	end
+	local area = player:GetAttribute("Area")
+	if area == 1 then
+		guide.model:Destroy()
+		guide = nil
+		Menus.notify("🌿 You made it! Walk over the grass to mow it, then sell it at the 💰 pad.", "good")
+		return
+	end
+	local char = player.Character
+	local head = char and char:FindFirstChild("Head")
+	if not head then
+		return
+	end
+	if not guide.bridgeStart and t - guide.lastLook > 1 then
+		guide.lastLook = t
+		guide.bridgeStart = findBridgeStart()
+	end
+	local pos = head.Position
+	local target = guide.goal
+	local bs = guide.bridgeStart
+	if bs and area == 0 and (V(pos.X, 0, pos.Z) - bs).Magnitude > 18 then
+		target = bs
+	end
+	local flat = V(target.X - pos.X, 0, target.Z - pos.Z)
+	if flat.Magnitude < 1 then
+		return
+	end
+	local origin = pos + V(0, 4.2 + math.sin(t * 4) * 0.35, 0)
+	local base = CFrame.lookAt(origin, origin + flat.Unit)
+	for _, it in ipairs(guide.parts) do
+		it[1].CFrame = base * it[2]
+	end
+end
+
 function World.init()
 	setupFx()
 	tint = Lighting:FindFirstChild("AreaTint") or Instance.new("ColorCorrectionEffect")
@@ -558,9 +647,11 @@ function World.init()
 		local camPos = workspace.CurrentCamera.CFrame.Position
 		animateWorld(t, dt, camPos)
 		animateWorkers(t, dt)
+		updateGuide(t)
 	end)
 
 	connectRemotes()
+	startGuide()
 
 	ProximityPromptService.PromptTriggered:Connect(function(prompt, who)
 		if who ~= player then

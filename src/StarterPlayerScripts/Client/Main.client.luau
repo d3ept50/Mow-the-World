@@ -12,6 +12,7 @@ Menus.init()
 require(script.Parent.Panels)
 local World = require(script.Parent.World)
 World.init()
+require(script.Parent.Controls).init()
 
 Menus.notify("🌿 Welcome to Mow the World! Walk through the Starter Meadow gate and start mowing.", "info")
 if State.data.daily.last ~= State.now() // 86400 then
