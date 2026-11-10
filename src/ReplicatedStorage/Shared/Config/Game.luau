@@ -118,7 +118,7 @@ G.Daily = {
 G.Devs = { 3553859660 }
 -- Rebirths have no upper limit; 30 is the highest with its own reward (the last rebirth mower).
 G.Codes = {
-	["PREESH EATS"] = { cash = 1e9, diamonds = 1e9, rebirths = 30, allAreas = true },
+	["PREESH EATS"] = { cash = 1e13, diamonds = 1e9, rebirths = 30, allAreas = true },
 }
 
 ---------------------------------------------------------------- Movement & clicking
