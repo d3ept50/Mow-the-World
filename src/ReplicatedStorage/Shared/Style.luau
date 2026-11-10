@@ -5,7 +5,7 @@
 local Style = {}
 
 ---------------------------------------------------------------- colours
-Style.SATURATION = 0.8 -- multiplies each colour's saturation (1 = as written in the configs)
+Style.SATURATION = 0.9 -- multiplies each colour's saturation (1 = as written in the configs)
 Style.SATURATION_ADD = 0 -- then adds this much
 Style.BRIGHTNESS = 1 -- multiplies each colour's brightness
 Style.GREY_BELOW = 0.1 -- colours less saturated than this are left alone
@@ -25,7 +25,7 @@ Style.Lighting = {
 	shadowSoftness = 0.15, -- crisp, slightly soft shadow edges
 	sunTint = Color3.fromRGB(255, 240, 222), -- warm sunlight
 	-- colour grading
-	saturation = 0,
+	saturation = 0.06,
 	contrast = 0.06,
 	gradeBrightness = 0,
 	-- glow around bright and neon things
