@@ -746,6 +746,17 @@ local function display(parent, model, cf, text)
 	local ped = part(parent, V(1, 5, 5), cf * CF(0, 0.9, 0) * ANG(0, 0, rad(90)), rgb(60, 60, 70), "Metal", "Cylinder")
 	deco(parent, V(0.3, 5.4, 5.4), cf * CF(0, 1.45, 0) * ANG(0, 0, rad(90)), rgb(255, 215, 90), "Neon", "Cylinder")
 	model:PivotTo(cf * CF(0, 1.6, 0))
+	-- Centre the model's bounding box over the pedestal, then move its pivot there so
+	-- the client spins it around the pedestal's axis instead of around its root part.
+	local root = model.PrimaryPart
+	if root then
+		local boxCf = model:GetBoundingBox()
+		local delta = cf.Position - boxCf.Position
+		model:PivotTo(model:GetPivot() + V(delta.X, 0, delta.Z))
+		local pivot = model:GetPivot()
+		local centre = CF(cf.Position.X, pivot.Position.Y, cf.Position.Z) * pivot.Rotation
+		root.PivotOffset = root.CFrame:ToObjectSpace(centre)
+	end
 	model.Parent = parent
 	CollectionService:AddTag(model, "SpinModel")
 	if text then

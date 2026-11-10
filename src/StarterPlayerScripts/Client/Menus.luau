@@ -57,7 +57,7 @@ function Menus.notify(text: string, kind: string?)
 	UI.tween(pop, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
 	new("TextLabel", { Text = text, Size = UDim2.new(1, -20, 1, -8), Position = UDim2.fromOffset(10, 4), BackgroundTransparency = 1, Font = Enum.Font.FredokaOne, TextColor3 = color, TextScaled = true, Parent = f }, { new("UITextSizeConstraint", { MaxTextSize = big and 21 or 17 }) })
 	if kind == "bad" then
-		UI.sfx("error", 1, 0.3)
+		UI.sfx("error", 0.6, 0.3)
 	elseif kind == "good" then
 		UI.sfx("buy", 1, 0.1)
 	elseif big then
@@ -240,7 +240,7 @@ local function buildHUD()
 	refs.bossTime = UI.text({ Position = UDim2.fromOffset(12, 2), Size = UDim2.new(1, -24, 0, 24), TextSize = 17, TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = T.gold, Parent = refs.boss })
 	refs.bossBar, refs.bossFill, refs.bossLabel = UI.bar({ Position = UDim2.fromOffset(10, 28), Size = UDim2.new(1, -20, 0, 24), Parent = refs.boss }, T.red)
 
-	refs.notes = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 130), Size = UDim2.fromOffset(560, 240), BackgroundTransparency = 1, Parent = root }, { new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	refs.notes = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 130), Size = UDim2.fromOffset(560, 240), BackgroundTransparency = 1, ZIndex = 70, Parent = root }, { new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }) })
 	refs.side = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(210, 320), BackgroundTransparency = 1, Parent = root }, { new("UIListLayout", { Padding = UDim.new(0, 4) }) })
 end
 
