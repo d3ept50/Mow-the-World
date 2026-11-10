@@ -1,5 +1,5 @@
--- Player input: sprint (hold Shift), click / tap to mow faster, and Ctrl for Roblox's
--- Shift Lock. The client only reports "sprinting" or "clicked"; the server decides the
+-- Player input: sprint (hold Shift), click / tap to mow faster, and Ctrl to lock the
+-- camera behind the character. The client only reports "sprinting" or "clicked"; the server decides the
 -- walk speed and does all the cutting.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,6 +8,7 @@ local UserInputService = game:GetService("UserInputService")
 local RS = game:GetService("ReplicatedStorage")
 
 local Input = RS:WaitForChild("Remotes"):WaitForChild("Input")
+local Menus = require(script.Parent.Menus)
 
 local Controls = {}
 
@@ -16,8 +17,15 @@ local SPRINT_KEYS = {
 	[Enum.KeyCode.RightShift] = true,
 	[Enum.KeyCode.ButtonL3] = true, -- gamepad: click the left stick
 }
--- Shift is used for sprinting, so Roblox's Shift Lock (mouse lock) is moved to Ctrl.
-local SHIFT_LOCK_KEYS = "LeftControl,RightControl"
+-- Shift is used for sprinting, so the game has its own camera lock on Ctrl. It behaves
+-- like Roblox's Shift Lock but works for every player, whatever their Roblox settings.
+local LOCK_KEYS = {
+	[Enum.KeyCode.LeftControl] = true,
+	[Enum.KeyCode.RightControl] = true,
+}
+local LOCK_OFFSET = Vector3.new(1.75, 0, 0) -- camera sits over the right shoulder
+local LOCK_STEP = "MTW_CameraLock"
+local locked = false
 local BASE_FOV, SPRINT_FOV = 70, 78
 local CLICK_GAP = 0.15 -- seconds between "cut" messages while clicking or holding
 
@@ -50,26 +58,81 @@ local function isPress(input: InputObject): boolean
 	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
 end
 
--- Roblox's camera scripts read the Shift Lock keys from a StringValue called BoundKeys.
-local function rebindShiftLock()
+---------------------------------------------------------------- camera lock (Ctrl)
+local function lockParts()
+	local char = Players.LocalPlayer.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	return hum, root
+end
+
+-- Runs every frame, just after Roblox's camera update, while the lock is on.
+local function lockStep()
+	local hum, root = lockParts()
+	if Menus.isOpen() then
+		-- free the cursor so menus can be clicked
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		if hum then
+			hum.AutoRotate = true
+		end
+		return
+	end
+	UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+	local cam = workspace.CurrentCamera
+	if hum and root and cam and hum.Health > 0 then
+		hum.AutoRotate = false
+		hum.CameraOffset = LOCK_OFFSET
+		local look = cam.CFrame.LookVector
+		local flat = Vector3.new(look.X, 0, look.Z)
+		if flat.Magnitude > 0.01 then
+			root.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
+		end
+	end
+end
+
+local function setLock(on: boolean)
+	if on == locked then
+		return
+	end
+	locked = on
+	if on then
+		RunService:BindToRenderStep(LOCK_STEP, Enum.RenderPriority.Camera.Value + 1, lockStep)
+	else
+		RunService:UnbindFromRenderStep(LOCK_STEP)
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		local hum = lockParts()
+		if hum then
+			hum.AutoRotate = true
+			hum.CameraOffset = Vector3.zero
+		end
+	end
+end
+
+-- Roblox's own Shift Lock uses Shift, which is now sprint, so switch it off for this game.
+local function disableRobloxShiftLock()
+	pcall(function()
+		Players.LocalPlayer.DevEnableMouseLock = false
+	end)
 	local node: Instance? = Players.LocalPlayer:WaitForChild("PlayerScripts", 10)
 	for _, name in ipairs({ "PlayerModule", "CameraModule", "MouseLockController", "BoundKeys" }) do
 		node = node and node:WaitForChild(name, 10)
 	end
 	if node and node:IsA("StringValue") then
-		node.Value = SHIFT_LOCK_KEYS
-	else
-		warn("[Controls] Could not find the Shift Lock key setting; Shift Lock stays on Shift")
+		node.Value = ""
 	end
 end
 
 function Controls.init()
-	task.spawn(rebindShiftLock)
+	task.spawn(disableRobloxShiftLock)
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if SPRINT_KEYS[input.KeyCode] then
 			if not UserInputService:GetFocusedTextBox() then
 				held[input.KeyCode] = true
 				setSprint(true)
+			end
+		elseif LOCK_KEYS[input.KeyCode] then
+			if not UserInputService:GetFocusedTextBox() then
+				setLock(not locked)
 			end
 		elseif isPress(input) and not processed then
 			pressing += 1
