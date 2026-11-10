@@ -28,7 +28,7 @@ Menus.titles = {
 	Workers = "👷 Workers", Crates = "📦 Worker Crates", Mowers = "✂️ Mowers", Bags = "🎒 Grass Bags", Vehicles = "🚜 Vehicles",
 	Rebirth = "🔁 Rebirth Shrine", Daily = "🎁 Daily Rewards", Achievements = "🏆 Achievements", Inventory = "🧳 Inventory",
 	Robux = "🛒 Robux Shop", Diamonds = "💎 Diamond Shop", Settings = "⚙️ Settings",
-	Teleport = "🧭 Teleport", More = "☰ Menu",
+	Teleport = "🧭 Teleport", More = "📋 Menu",
 }
 
 local function rarityColor(rarityId: string): Color3

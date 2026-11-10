@@ -263,8 +263,8 @@ end
 local function healthBar(it)
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "Health"
-	bb.Size = UDim2.fromScale(3.4, 0.5)
-	bb.StudsOffsetWorldSpace = V(0, 5.2, 0)
+	bb.Size = UDim2.fromOffset(78, 16) -- a fixed size on screen, so it reads from across the arena
+	bb.StudsOffsetWorldSpace = V(0, 5.6, 0)
 	bb.AlwaysOnTop = true
 	bb.LightInfluence = 0
 	bb.MaxDistance = 140

@@ -25,7 +25,7 @@ local renderQueued = false
 -- Buttons that are always on screen: { icon, label, panel }.
 Menus.MENU = {
 	{ "👷", "Workers", "Workers" }, { "🧭", "Teleport", "Teleport" }, { "🎁", "Daily", "Daily" },
-	{ "🛒", "Shop", "Robux" }, { "☰", "Menu", "More" },
+	{ "🛒", "Shop", "Robux" }, { "📋", "Menu", "More" },
 }
 -- Everything else lives behind the Menu button (and at the shops in the marketplace).
 Menus.MORE = {
