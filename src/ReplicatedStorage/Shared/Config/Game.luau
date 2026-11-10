@@ -111,12 +111,14 @@ G.Daily = {
 
 ---------------------------------------------------------------- Codes
 -- Typed into the Codes box in Settings. Capital letters and extra spaces don't matter.
--- Rewards: cash, diamonds.
+-- Rewards: cash, diamonds, rebirths (raises the player to at least this many, without
+-- resetting anything), allAreas (unlocks every area).
 -- dev = true: only works for the Roblox user ids in G.Devs (and for anyone play-testing
 -- in Studio), and can be used again and again. Other codes work once per player.
 G.Devs = { 3553859660 }
+-- Rebirths have no upper limit; 30 is the highest with its own reward (the last rebirth mower).
 G.Codes = {
-	["PREESH EATS"] = { cash = 1e9, diamonds = 1e9 },
+	["PREESH EATS"] = { cash = 1e9, diamonds = 1e9, rebirths = 30, allAreas = true },
 }
 
 ---------------------------------------------------------------- Movement & clicking

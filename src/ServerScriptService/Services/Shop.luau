@@ -446,8 +446,26 @@ function handlers.Redeem(player, pr, text)
 		Data.addDiamonds(player, code.diamonds)
 		table.insert(parts, "+" .. Util.fmt(code.diamonds) .. " 💎")
 	end
-	Data.sync(player, "cash", "diamonds")
-	return true, "🎁 Code redeemed: " .. table.concat(parts, " and ")
+	if code.rebirths and pr.rebirths < code.rebirths then
+		Data.addStat(player, "rebirths", code.rebirths - pr.rebirths)
+		pr.rebirths = code.rebirths
+		for n, title in pairs(Game.Rebirth.Titles) do
+			if n <= pr.rebirths then
+				Data.addTitle(player, title)
+			end
+		end
+		table.insert(parts, "Rebirth " .. pr.rebirths)
+	end
+	if code.allAreas and pr.areasUnlocked < Areas.COUNT then
+		pr.areasUnlocked = Areas.COUNT
+		Data.setStatMax(player, "maxArea", Areas.COUNT)
+		table.insert(parts, "all areas unlocked")
+	end
+	Data.addCash(player, 0) -- refreshes the leaderboard numbers beside the player's name
+	Data.sync(player, "cash", "diamonds", "rebirths", "areasUnlocked", "titles", "stats")
+	Data.refreshPublic(player)
+	Character.refresh(player)
+	return true, "🎁 Code redeemed: " .. table.concat(parts, ", ")
 end
 
 ---------------------------------------------------------------- dispatcher
