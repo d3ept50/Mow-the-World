@@ -6,10 +6,38 @@ A Roblox mowing simulator. Players cut grass, sell it, buy better gear, collect 
 
 | Folder | Contents |
 |---|---|
+| `src/` | Every script in the game, as `.luau` files |
 | `docs/` | The design doc: game loop, areas, items, code layout, launch checklist |
 | `models/` | 3D models made in Blender, with the scripts that build them |
+| `default.project.json` | Tells Rojo where each `src` folder goes in the place |
 
-The game's scripts are not here yet. They will go in `src/` and sync into Roblox Studio with [Rojo](https://rojo.space).
+## Scripts
+
+`src/` mirrors the place:
+
+| Folder | Goes to |
+|---|---|
+| `src/ServerScriptService` | ServerScriptService (`Main` and `Services`) |
+| `src/ReplicatedStorage` | ReplicatedStorage (`Shared` and `Remotes`) |
+| `src/StarterPlayerScripts` | StarterPlayer > StarterPlayerScripts (`Client`) |
+
+Terrain and anything else in the place file is not in this repo.
+
+### Working on scripts
+
+1. Install [Rojo](https://rojo.space) 7.7 or newer, and its Studio plugin.
+2. Get the latest changes: `git pull`
+3. In this folder run `rojo serve`, then press **Connect** in the Rojo plugin in Studio.
+4. Edit the `.luau` files. Rojo copies each save into Studio.
+5. Share your changes: `git add -A`, `git commit -m "what changed"`, `git push`
+
+Edit scripts in these files, not in Studio. While Rojo is connected it overwrites script edits made in Studio.
+
+To pull scripts out of a saved place file instead (for example after editing in Studio):
+
+```bash
+rojo syncback --input Place3.rbxl
+```
 
 ## Models
 

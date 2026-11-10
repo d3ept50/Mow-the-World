@@ -8,3 +8,6 @@
 # OS files
 Thumbs.db
 .DS_Store
+# Place files (the scripts live in src/)
+*.rbxl
+*.rbxlx
