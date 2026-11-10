@@ -11,6 +11,7 @@ local Areas = require(RS.Shared.Config.Areas)
 local W = require(RS.Shared.Config.Workers)
 local Util = require(RS.Shared.Util)
 local Models = require(RS.Shared.Models)
+local Style = require(RS.Shared.Style)
 local Scenery = require(script.Parent.Scenery)
 
 local WB = {}
@@ -42,8 +43,8 @@ local function part(parent, size, cf, color, mat, shape)
 	end
 	p.Size = size
 	p.CFrame = typeof(cf) == "Vector3" and CF(cf) or cf
-	p.Color = color
-	p.Material = Enum.Material[mat or "SmoothPlastic"]
+	p.Color = Style.color(color)
+	p.Material = Style.material(Enum.Material[mat or "SmoothPlastic"])
 	p.Parent = parent
 	return p
 end
@@ -237,7 +238,7 @@ function WB.applyTerrainLook()
 	local terrain = workspace.Terrain
 	local function col(mat, c)
 		pcall(function()
-			terrain:SetMaterialColor(Enum.Material[mat], c)
+			terrain:SetMaterialColor(Enum.Material[mat], Style.color(c))
 		end)
 	end
 	for _, a in ipairs(Areas.List) do
@@ -246,7 +247,7 @@ function WB.applyTerrainLook()
 	col("Sand", rgb(232, 210, 158))
 	col("Pavement", rgb(205, 190, 170))
 	col("Rock", rgb(120, 118, 116))
-	terrain.WaterColor = rgb(38, 150, 205)
+	terrain.WaterColor = Style.WATER
 	terrain.WaterTransparency = 0.3
 	terrain.WaterReflectance = 0.35
 	terrain.WaterWaveSize = 0.12
@@ -336,18 +337,19 @@ function WB.buildTerrain(force: boolean?)
 end
 
 local function buildLighting()
-	Lighting.Brightness = 2.4
+	local look = Style.Lighting
+	Lighting.Brightness = look.brightness
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = 1
-	Lighting.ShadowSoftness = 0.25
+	Lighting.ShadowSoftness = look.shadowSoftness
 	Lighting.GeographicLatitude = 35
 	Lighting.ColorShift_Top = rgb(255, 244, 225)
-	Lighting.ExposureCompensation = 0.05
+	Lighting.ExposureCompensation = look.exposure
 	local grade = Lighting:FindFirstChild("Grade") or Instance.new("ColorCorrectionEffect")
 	grade.Name = "Grade"
-	grade.Saturation = 0.18
-	grade.Contrast = 0.08
-	grade.Brightness = 0.01
+	grade.Saturation = look.saturation
+	grade.Contrast = look.contrast
+	grade.Brightness = look.gradeBrightness
 	grade.Parent = Lighting
 	local bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect")
 	bloom.Intensity = 0.35

@@ -7,6 +7,7 @@ local RS = game:GetService("ReplicatedStorage")
 local Areas = require(RS.Shared.Config.Areas)
 local Game = require(RS.Shared.Config.Game)
 local Util = require(RS.Shared.Util)
+local Style = require(RS.Shared.Style)
 local Data = require(script.Parent.Data)
 local Remotes = RS.Remotes
 
@@ -311,7 +312,7 @@ function Grass.init()
 		folder.Name = tostring(areaId)
 		local st = { hp = table.create(TILES, a.grassHP), alive = table.create(TILES, true), parts = table.create(TILES), queue = {}, head = 1 }
 		local rng = Random.new(areaId)
-		local h, s, v = a.grass:ToHSV()
+		local h, s, v = Style.color(a.grass):ToHSV()
 		for idx = 1, TILES do
 			local pos = Areas.tilePos(areaId, idx)
 			local height = 1.3 + rng:NextNumber() * 0.9
@@ -324,7 +325,7 @@ function Grass.init()
 			p.CastShadow = false
 			p.TopSurface = Enum.SurfaceType.Smooth
 			p.BottomSurface = Enum.SurfaceType.Smooth
-			p.Material = Enum.Material.Grass
+			p.Material = Style.material(Enum.Material.Grass)
 			p.Color = Color3.fromHSV(h, s, math.clamp(v * rng:NextNumber(0.86, 1.06), 0, 1))
 			p.Size = Vector3.new(TILE, height, TILE)
 			p.Position = Vector3.new(pos.X, 0.2 + height / 2, pos.Z)

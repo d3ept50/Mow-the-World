@@ -3,6 +3,7 @@
 local CollectionService = game:GetService("CollectionService")
 local RS = game:GetService("ReplicatedStorage")
 local Models = require(RS.Shared.Models)
+local Style = require(RS.Shared.Style)
 
 local Scenery = {}
 
@@ -22,8 +23,8 @@ local function make(class, parent, size, cf, color, mat, shape)
 	end
 	p.Size = size
 	p.CFrame = typeof(cf) == "Vector3" and CF(cf) or cf
-	p.Color = color
-	p.Material = Enum.Material[mat or "SmoothPlastic"]
+	p.Color = Style.color(color)
+	p.Material = Style.material(Enum.Material[mat or "SmoothPlastic"])
 	p.Parent = parent
 	return p
 end

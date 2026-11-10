@@ -4,6 +4,7 @@ local Config = script.Parent.Config
 local Workers = require(Config.Workers)
 local Items = require(Config.Items)
 local Areas = require(Config.Areas)
+local Style = require(script.Parent.Style)
 
 local Models = {}
 
@@ -32,8 +33,8 @@ local function P(parent, size, cf, color, mat, shape)
 	end
 	p.Size = size
 	p.CFrame = cf
-	p.Color = color
-	p.Material = mat and Enum.Material[mat] or Enum.Material.SmoothPlastic
+	p.Color = Style.color(color)
+	p.Material = Style.material(mat and Enum.Material[mat] or Enum.Material.SmoothPlastic)
 	p.Parent = parent
 	return p
 end

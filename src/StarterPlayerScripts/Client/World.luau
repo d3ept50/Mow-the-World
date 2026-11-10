@@ -16,6 +16,7 @@ local Game = require(Config.Game)
 local Areas = require(Config.Areas)
 local Util = require(RS.Shared.Util)
 local Models = require(RS.Shared.Models)
+local Style = require(RS.Shared.Style)
 local State = require(script.Parent.State)
 local UI = require(script.Parent.UI)
 local Menus = require(script.Parent.Menus)
@@ -130,7 +131,7 @@ local function applySky(areaId)
 	local sky = a and a.sky or MARKET_SKY
 	local info = TweenInfo.new(1.6, Enum.EasingStyle.Sine)
 	TweenService:Create(Lighting, info, { ClockTime = sky.clock, Ambient = sky.ambient, OutdoorAmbient = sky.ambient }):Play()
-	TweenService:Create(atmosphere, info, { Color = sky.fog, Decay = sky.fog, Density = sky.density }):Play()
+	TweenService:Create(atmosphere, info, { Color = sky.fog, Decay = sky.fog, Density = sky.density * Style.FOG }):Play()
 	TweenService:Create(tint, info, { TintColor = sky.tint }):Play()
 end
 
