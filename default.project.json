@@ -8,6 +8,11 @@
     "ReplicatedStorage": {
       "$path": "src/ReplicatedStorage"
     },
+    "Lighting": {
+      "$properties": {
+        "Technology": "Future"
+      }
+    },
     "StarterPlayer": {
       "StarterPlayerScripts": {
         "$path": "src/StarterPlayerScripts"

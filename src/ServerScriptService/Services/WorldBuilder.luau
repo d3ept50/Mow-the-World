@@ -247,11 +247,12 @@ function WB.applyTerrainLook()
 	col("Sand", rgb(232, 210, 158))
 	col("Pavement", rgb(205, 190, 170))
 	col("Rock", rgb(120, 118, 116))
-	terrain.WaterColor = Style.WATER
-	terrain.WaterTransparency = 0.3
-	terrain.WaterReflectance = 0.35
-	terrain.WaterWaveSize = 0.12
-	terrain.WaterWaveSpeed = 9
+	local water = Style.Water
+	terrain.WaterColor = water.color
+	terrain.WaterTransparency = water.transparency
+	terrain.WaterReflectance = water.reflectance
+	terrain.WaterWaveSize = water.waveSize
+	terrain.WaterWaveSpeed = water.waveSpeed
 	local clouds = terrain:FindFirstChildOfClass("Clouds") or Instance.new("Clouds")
 	clouds.Cover = 0.52
 	clouds.Density = 0.55
@@ -343,7 +344,8 @@ local function buildLighting()
 	Lighting.EnvironmentSpecularScale = 1
 	Lighting.ShadowSoftness = look.shadowSoftness
 	Lighting.GeographicLatitude = 35
-	Lighting.ColorShift_Top = rgb(255, 244, 225)
+	Lighting.ColorShift_Top = look.sunTint
+	Lighting.GlobalShadows = true
 	Lighting.ExposureCompensation = look.exposure
 	local grade = Lighting:FindFirstChild("Grade") or Instance.new("ColorCorrectionEffect")
 	grade.Name = "Grade"
@@ -352,21 +354,20 @@ local function buildLighting()
 	grade.Brightness = look.gradeBrightness
 	grade.Parent = Lighting
 	local bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect")
-	bloom.Intensity = 0.35
-	bloom.Size = 24
-	bloom.Threshold = 2
+	bloom.Intensity = look.bloomIntensity
+	bloom.Size = look.bloomSize
+	bloom.Threshold = look.bloomThreshold
 	bloom.Parent = Lighting
 	local rays = Lighting:FindFirstChildOfClass("SunRaysEffect") or Instance.new("SunRaysEffect")
-	rays.Intensity = 0.06
+	rays.Intensity = look.sunRays
 	rays.Spread = 0.8
 	rays.Parent = Lighting
-	local dof = Lighting:FindFirstChildOfClass("DepthOfFieldEffect")
-	if dof then
-		dof.FarIntensity = 0.12
-		dof.FocusDistance = 60
-		dof.InFocusRadius = 260
-		dof.NearIntensity = 0
-	end
+	local dof = Lighting:FindFirstChildOfClass("DepthOfFieldEffect") or Instance.new("DepthOfFieldEffect")
+	dof.FarIntensity = look.farBlur
+	dof.FocusDistance = look.focusDistance
+	dof.InFocusRadius = look.inFocusRadius
+	dof.NearIntensity = 0
+	dof.Parent = Lighting
 end
 
 ---------------------------------------------------------------- fences

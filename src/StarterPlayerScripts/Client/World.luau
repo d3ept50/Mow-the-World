@@ -130,7 +130,7 @@ local function applySky(areaId)
 	local a = Areas.List[areaId]
 	local sky = a and a.sky or MARKET_SKY
 	local info = TweenInfo.new(1.6, Enum.EasingStyle.Sine)
-	TweenService:Create(Lighting, info, { ClockTime = sky.clock, Ambient = sky.ambient, OutdoorAmbient = sky.ambient }):Play()
+	TweenService:Create(Lighting, info, { ClockTime = sky.clock, Ambient = sky.ambient:Lerp(Color3.new(), 1 - Style.AMBIENT), OutdoorAmbient = sky.ambient:Lerp(Color3.new(), 1 - Style.OUTDOOR_AMBIENT) }):Play()
 	TweenService:Create(atmosphere, info, { Color = sky.fog, Decay = sky.fog, Density = sky.density * Style.FOG }):Play()
 	TweenService:Create(tint, info, { TintColor = sky.tint }):Play()
 end
@@ -628,6 +628,9 @@ function World.init()
 	tint.Name = "AreaTint"
 	tint.Parent = Lighting
 	atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
+	atmosphere.Haze = Style.HAZE
+	atmosphere.Glare = Style.GLARE
+	atmosphere.Offset = Style.AIR_OFFSET
 	atmosphere.Parent = Lighting
 
 	updateGates()
