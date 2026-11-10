@@ -483,7 +483,8 @@ local SHOP_PANEL = { Mowers = "Mowers", Bags = "Bags", Crates = "Crates", Vehicl
 
 ---------------------------------------------------------------- guide arrow
 -- An arrow over the player's head. Red: the bag is full, so it points to where to sell.
--- Green: it leads a brand-new player to the first area (bridge first, then across).
+-- Green: it leads a beginner (someone who has not unlocked the second area yet) to the
+-- first area whenever they are away from it, bridge first, then across.
 -- The compass button in the HUD turns it off (UI.settings.arrow).
 local GUIDE_GREEN, GUIDE_RED = Color3.fromRGB(120, 255, 90), Color3.fromRGB(255, 70, 60)
 local guide = { model = nil, parts = nil, color = nil, newPlayer = false, bridgeStart = nil, lastLook = 0, sellTarget = nil }
@@ -563,7 +564,7 @@ local function updateGuide(t)
 		if d.bagCount > 0 and d.bagCount >= State.bagCapacity() - 0.001 then
 			guide.sellTarget = sellTarget(area)
 			target, color = guide.sellTarget, GUIDE_RED
-		elseif guide.newPlayer then
+		elseif d.areasUnlocked <= 1 and d.rebirths == 0 and area ~= 1 then
 			if not guide.bridgeStart and t - guide.lastLook > 1 then
 				guide.lastLook = t
 				guide.bridgeStart = findBridgeStart()
