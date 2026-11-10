@@ -482,22 +482,27 @@ end
 local SHOP_PANEL = { Mowers = "Mowers", Bags = "Bags", Crates = "Crates", Vehicles = "Vehicles", Rebirth = "Rebirth", Diamonds = "Diamonds", Robux = "Robux" }
 
 ---------------------------------------------------------------- guide arrow
--- An arrow over the player's head. Red: the bag is full, so it points to where to sell.
--- Green: it leads a beginner (someone who has not unlocked the second area yet) to the
--- first area whenever they are away from it, bridge first, then across.
+-- An arrow over the player's head.
+-- Red: the bag is full, so it points to the nearest place to sell.
+-- Green: it points the way to the highest area the player has unlocked, whenever they
+-- are not in it: first to the start of the bridge into that area, then to its gate.
 -- The compass button in the HUD turns it off (UI.settings.arrow).
 local GUIDE_GREEN, GUIDE_RED = Color3.fromRGB(120, 255, 90), Color3.fromRGB(255, 70, 60)
-local guide = { model = nil, parts = nil, color = nil, newPlayer = false, bridgeStart = nil, lastLook = 0, sellTarget = nil }
+local guide = { model = nil, parts = nil, color = nil, greeted = false, route = nil, lastLook = 0 }
 
-local function findBridgeStart()
+-- The gate into an area and the far end of the bridge that leads to it.
+local function findRoute(areaId)
 	for _, g in ipairs(CollectionService:GetTagged("Gate")) do
-		if g:GetAttribute("Area") == 1 then
-			-- the gate is thin along the bridge; the bridge runs from it back towards the market
-			local gp = g.Position
+		if g:GetAttribute("Area") == areaId then
+			-- the gate is thin along the bridge, and the bridge runs away from the area's centre
+			local gp, c = g.Position, Areas.List[areaId].center
+			local bridgeStart
 			if g.Size.X < g.Size.Z then
-				return V(gp.X - math.sign(gp.X) * Areas.GAP, 0, gp.Z)
+				bridgeStart = V(gp.X + math.sign(gp.X - c.X) * Areas.GAP, 0, gp.Z)
+			else
+				bridgeStart = V(gp.X, 0, gp.Z + math.sign(gp.Z - c.Z) * Areas.GAP)
 			end
-			return V(gp.X, 0, gp.Z - math.sign(gp.Z) * Areas.GAP)
+			return { area = areaId, gate = V(gp.X, 0, gp.Z), bridgeStart = bridgeStart }
 		end
 	end
 	return nil
@@ -505,9 +510,7 @@ end
 
 local function startGuide()
 	local d = State.data
-	local cutSoFar = d.stats and d.stats.grassCut or 0
-	guide.newPlayer = d.areasUnlocked <= 1 and d.rebirths == 0 and cutSoFar == 0
-	guide.bridgeStart = findBridgeStart()
+	guide.greeted = (d.stats and d.stats.grassCut or 0) > 0 or d.areasUnlocked > 1 or d.rebirths > 0
 
 	local model = Instance.new("Model")
 	model.Name = "GuideArrow"
@@ -534,16 +537,43 @@ local function startGuide()
 	guide.model, guide.parts = model, parts -- stays out of the workspace until it has a target
 end
 
--- Where to sell from here: this area's pad, the market's sell shop, or (on a bridge)
--- wherever the arrow was already heading.
-local function sellTarget(area)
-	local a = area and area >= 1 and Areas.List[area]
-	if a then
-		return a.sellPos
-	elseif area == 0 then
-		return Areas.Shops.Sell
+-- The closest sell spot: the marketplace sell shop or the pad of any unlocked area.
+local function nearestSell(pos, unlocked)
+	local best, bestD = Areas.Shops.Sell, math.huge
+	local function consider(p)
+		local dx, dz = p.X - pos.X, p.Z - pos.Z
+		local d2 = dx * dx + dz * dz
+		if d2 < bestD then
+			best, bestD = p, d2
+		end
 	end
-	return guide.sellTarget or Areas.Shops.Sell
+	consider(Areas.Shops.Sell)
+	for i = 1, math.min(unlocked, Areas.COUNT) do
+		consider(Areas.List[i].sellPos)
+	end
+	return best
+end
+
+-- Where the green arrow should lead: nil when the player is already in their best area.
+local function farmTarget(pos, area, unlocked, t)
+	local best = math.clamp(unlocked, 1, Areas.COUNT)
+	if area == best then
+		return nil
+	end
+	if (not guide.route or guide.route.area ~= best) and t - guide.lastLook > 1 then
+		guide.lastLook = t
+		guide.route = findRoute(best)
+	end
+	local route = guide.route
+	if not route or route.area ~= best then
+		return Areas.List[best].center -- gate not loaded yet
+	end
+	-- on an island: head for the bridge first. On a bridge (no area): head for the gate.
+	local onIsland = area ~= nil and area >= 0
+	if onIsland and (V(pos.X, 0, pos.Z) - route.bridgeStart).Magnitude > 18 then
+		return route.bridgeStart
+	end
+	return route.gate
 end
 
 local function updateGuide(t)
@@ -551,9 +581,9 @@ local function updateGuide(t)
 		return
 	end
 	local area = player:GetAttribute("Area")
-	if guide.newPlayer and area == 1 then
-		guide.newPlayer = false
-		Menus.notify("🌿 You made it! Walk over the grass to mow it, then sell it at the 💰 pad.", "good")
+	if not guide.greeted and area == 1 then
+		guide.greeted = true
+		Menus.notify("🌿 You made it! Walk over the grass to mow it. When your bag is full, follow the red arrow to sell.", "good")
 	end
 	local char = player.Character
 	local head = char and char:FindFirstChild("Head")
@@ -562,18 +592,9 @@ local function updateGuide(t)
 	if head and UI.settings.arrow then
 		local pos = head.Position
 		if d.bagCount > 0 and d.bagCount >= State.bagCapacity() - 0.001 then
-			guide.sellTarget = sellTarget(area)
-			target, color = guide.sellTarget, GUIDE_RED
-		elseif d.areasUnlocked <= 1 and d.rebirths == 0 and area ~= 1 then
-			if not guide.bridgeStart and t - guide.lastLook > 1 then
-				guide.lastLook = t
-				guide.bridgeStart = findBridgeStart()
-			end
-			local bs = guide.bridgeStart
-			target, color = Areas.List[1].center, GUIDE_GREEN
-			if bs and area == 0 and (V(pos.X, 0, pos.Z) - bs).Magnitude > 18 then
-				target = bs
-			end
+			target, color = nearestSell(pos, d.areasUnlocked), GUIDE_RED
+		else
+			target, color = farmTarget(pos, area, d.areasUnlocked, t), GUIDE_GREEN
 		end
 		if target then
 			local flat = V(target.X - pos.X, 0, target.Z - pos.Z)
@@ -587,9 +608,6 @@ local function updateGuide(t)
 				end
 			end
 		end
-	end
-	if color ~= GUIDE_RED then
-		guide.sellTarget = nil
 	end
 	if target and color ~= guide.color then
 		guide.color = color
