@@ -1,6 +1,6 @@
 -- Player input: sprint (hold Shift), click / tap to mow faster, and Ctrl to lock the
--- camera behind the character. The client only reports "sprinting" or "clicked"; the server decides the
--- walk speed and does all the cutting.
+-- camera behind the character. The client only reports "sprinting" or "clicked"; the
+-- server decides the walk speed and does all the cutting.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -25,7 +25,10 @@ local LOCK_KEYS = {
 }
 local LOCK_OFFSET = Vector3.new(1.75, 0, 0) -- camera sits over the right shoulder
 local LOCK_STEP = "MTW_CameraLock"
+local LOCK_CURSOR = "rbxasset://textures/MouseLockedCursor.png" -- Roblox's Shift Lock crosshair
 local locked = false
+local cursorOn = false
+
 local BASE_FOV, SPRINT_FOV = 70, 78
 local CLICK_GAP = 0.15 -- seconds between "cut" messages while clicking or holding
 
@@ -66,18 +69,27 @@ local function lockParts()
 	return hum, root
 end
 
+local function setCursor(on: boolean)
+	if on ~= cursorOn then
+		cursorOn = on
+		UserInputService.MouseIcon = on and LOCK_CURSOR or ""
+	end
+end
+
 -- Runs every frame, just after Roblox's camera update, while the lock is on.
 local function lockStep()
 	local hum, root = lockParts()
 	if Menus.isOpen() then
 		-- free the cursor so menus can be clicked
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		setCursor(false)
 		if hum then
 			hum.AutoRotate = true
 		end
 		return
 	end
 	UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+	setCursor(true)
 	local cam = workspace.CurrentCamera
 	if hum and root and cam and hum.Health > 0 then
 		hum.AutoRotate = false
@@ -100,6 +112,7 @@ local function setLock(on: boolean)
 	else
 		RunService:UnbindFromRenderStep(LOCK_STEP)
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		setCursor(false)
 		local hum = lockParts()
 		if hum then
 			hum.AutoRotate = true
@@ -108,11 +121,8 @@ local function setLock(on: boolean)
 	end
 end
 
--- Roblox's own Shift Lock uses Shift, which is now sprint, so switch it off for this game.
+-- Roblox's own Shift Lock uses Shift, which is now sprint, so take its keys away.
 local function disableRobloxShiftLock()
-	pcall(function()
-		Players.LocalPlayer.DevEnableMouseLock = false
-	end)
 	local node: Instance? = Players.LocalPlayer:WaitForChild("PlayerScripts", 10)
 	for _, name in ipairs({ "PlayerModule", "CameraModule", "MouseLockController", "BoundKeys" }) do
 		node = node and node:WaitForChild(name, 10)

@@ -59,7 +59,7 @@ function Character.updateSpeed(player: Player)
 		return
 	end
 	local v = Data.ridingVehicle(player)
-	local speed = (v and v.speed or 20) * (Data.boost(pr, "speed") and 1.5 or 1)
+	local speed = (v and v.speed or 20) * Game.Speed.mult * (Data.boost(pr, "speed") and 1.5 or 1)
 	if player:GetAttribute("Sprinting") then
 		speed *= Game.Sprint.mult
 	end

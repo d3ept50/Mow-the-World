@@ -79,10 +79,20 @@ function Models.weld(model: Model)
 	local root = model.PrimaryPart
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") and d ~= root then
-			local w = Instance.new("WeldConstraint")
-			w.Part0 = root
-			w.Part1 = d
-			w.Parent = d
+			if d.Name == "ScissorBlade" then
+				-- a classic Weld, not a WeldConstraint, so clients can turn the blade by its C0
+				local j = Instance.new("Weld")
+				j.Name = "BladeJoint"
+				j.Part0 = root
+				j.Part1 = d
+				j.C0 = root.CFrame:ToObjectSpace(d.CFrame)
+				j.Parent = d
+			else
+				local w = Instance.new("WeldConstraint")
+				w.Part0 = root
+				w.Part1 = d
+				w.Parent = d
+			end
 			d.Anchored = false
 		end
 	end
@@ -191,8 +201,12 @@ function Models.mower(id: string): Model
 	m:SetAttribute("Kind", L.kind)
 	if L.kind == "scissors" then
 		-- hand held, origin at the hand, pointing forward (-Z)
-		P(m, V(0.18, 0.08, 1.7), CF(0, 1, -0.9) * ANG(0, rad(10), 0), L.color, "Metal")
-		P(m, V(0.18, 0.08, 1.7), CF(0, 1.08, -0.9) * ANG(0, rad(-10), 0), L.color, "Metal")
+		-- the blades are named so Models.weld gives them a joint that clients can animate
+		for _, side in ipairs({ 1, -1 }) do
+			local blade = P(m, V(0.18, 0.08, 1.7), CF(0, side == 1 and 1 or 1.08, -0.9) * ANG(0, rad(10 * side), 0), L.color, "Metal")
+			blade.Name = "ScissorBlade"
+			blade:SetAttribute("Side", side)
+		end
 		P(m, V(0.45, 0.14, 0.45), CF(-0.25, 1.04, 0.1), L.accent)
 		P(m, V(0.45, 0.14, 0.45), CF(0.25, 1.04, 0.1), L.accent)
 	else

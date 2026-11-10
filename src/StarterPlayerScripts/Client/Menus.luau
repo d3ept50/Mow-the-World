@@ -211,6 +211,14 @@ local function buildHUD()
 	refs.diamonds = pill(cur, "💎", T.cyan)
 	refs.rebirths = pill(cur, "🔁", T.purple)
 
+	-- guide arrow on / off, next to the currency pills
+	local arrowBtn
+	arrowBtn = UI.button({ Name = "ArrowToggle", Text = "🧭", TextSize = 22, BackgroundColor3 = T.green, Corner = 21, Position = UDim2.fromOffset(224, 8), Size = UDim2.fromOffset(42, 42), Parent = root }, function()
+		UI.settings.arrow = not UI.settings.arrow
+		arrowBtn.BackgroundColor3 = UI.settings.arrow and T.green or T.grey
+		Menus.notify(UI.settings.arrow and "🧭 Guide arrow on" or "🧭 Guide arrow off", "info")
+	end)
+
 	local grid = new("Frame", { Name = "Menu", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 12, 0.58, 0), Size = UDim2.fromOffset(216, 300), BackgroundTransparency = 1, Parent = root }, { new("UIGridLayout", { CellSize = UDim2.fromOffset(66, 68), CellPadding = UDim2.fromOffset(7, 7), SortOrder = Enum.SortOrder.LayoutOrder }) })
 	for i, m in ipairs(Menus.MENU) do
 		local b = UI.button({ Name = m[3], BackgroundColor3 = MENU_COLORS[m[3]] or T.card, LayoutOrder = i, Corner = 16, Parent = grid }, function()

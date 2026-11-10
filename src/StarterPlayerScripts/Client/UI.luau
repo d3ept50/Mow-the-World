@@ -27,7 +27,7 @@ UI.Theme = {
 	ink = Color3.fromRGB(12, 13, 22),
 }
 local T = UI.Theme
-UI.settings = { music = true, sfx = true, otherWorkers = true, effects = true }
+UI.settings = { music = true, sfx = true, otherWorkers = true, effects = true, arrow = true }
 
 function UI.new(class: string, props, children)
 	local inst = Instance.new(class)

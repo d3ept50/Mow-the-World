@@ -19,6 +19,7 @@ local cutCallbacks = {}
 local nextHit = {}
 local lastHit = {}
 local clickUntil = {} -- [player] = time the click boost runs out
+local mowingUntil = {} -- [player] = time the "Mowing" attribute switches off
 local nextWorker = {}
 local lastFullWarn = {}
 local fxBatch = {}
@@ -142,6 +143,7 @@ local function mowerHit(player, pr, areaId, pos, s)
 	local r2 = (s.radius + TILE * 0.35) ^ 2
 	local a = Areas.List[areaId]
 	local ox, oz = a.center.X - GRID * TILE / 2, a.center.Z - GRID * TILE / 2
+	local hits = 0
 	for dr = -reach, reach do
 		local rr = row + dr
 		if rr >= 0 and rr < GRID then
@@ -154,12 +156,14 @@ local function mowerHit(player, pr, areaId, pos, s)
 						local dz = oz + (rr + 0.5) * TILE - pos.Z
 						if dx * dx + dz * dz <= r2 then
 							damage(player, pr, areaId, idx, s.damage, s.eff)
+							hits += 1
 						end
 					end
 				end
 			end
 		end
 	end
+	return hits
 end
 
 local WORKER_REACH = 7
@@ -261,13 +265,20 @@ local function step()
 						local mult = (clickUntil[player] or 0) > now and Game.Click.mult or 1
 						nextHit[player] = now + 1 / (s.speed * mult)
 						lastHit[player] = now
-						mowerHit(player, pr, areaId, pos, s)
+						if mowerHit(player, pr, areaId, pos, s) > 0 then
+							mowingUntil[player] = now + 1 / (s.speed * mult) + 0.35
+						end
 					end
 					if now >= (nextWorker[player] or 0) then
 						nextWorker[player] = now + 1
 						workersHit(player, pr, areaId, pos)
 					end
 				end
+			end
+			-- clients animate the tool and play its sound while this is true
+			local mowing = (mowingUntil[player] or 0) > now
+			if player:GetAttribute("Mowing") ~= mowing then
+				player:SetAttribute("Mowing", mowing)
 			end
 		end
 	end
@@ -344,6 +355,7 @@ function Grass.init()
 	Players.PlayerRemoving:Connect(function(player)
 		lastHit[player] = nil
 		clickUntil[player] = nil
+		mowingUntil[player] = nil
 		nextHit[player] = nil
 		nextWorker[player] = nil
 		lastFullWarn[player] = nil

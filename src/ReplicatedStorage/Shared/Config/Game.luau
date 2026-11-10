@@ -110,6 +110,7 @@ G.Daily = {
 }
 
 ---------------------------------------------------------------- Movement & clicking
+G.Speed = { mult = 1.3 } -- multiplies all movement: walking (base 20) and every vehicle
 G.Sprint = { mult = 1.4 } -- walk speed multiplier while Shift is held
 -- Clicking (or holding the mouse / a touch) makes the mower hit this many times faster.
 -- window = how long one click keeps the boost going, in seconds.
@@ -118,7 +119,8 @@ G.Click = { mult = 2, window = 0.45 }
 ---------------------------------------------------------------- Sounds
 G.Sounds = {
 	music = "rbxassetid://113283307098724",
-	cut = "rbxasset://sounds/snap.mp3",
+	snip = "rbxassetid://9118816543", -- "Scissors Accelerate Cutting Brush 1", Pro Sound Effects
+	mow = "rbxassetid://9116245012", -- "Lawn Mower Motor 2", Pro Sound Effects
 	sell = "rbxassetid://135483737426662",
 	click = "rbxasset://sounds/clickfast.wav",
 	buy = "rbxasset://sounds/electronicpingshort.wav",
@@ -130,5 +132,12 @@ G.Sounds = {
 	win = "rbxassetid://9067124098",
 	pop = "rbxasset://sounds/button.wav",
 }
+
+-- Which sound each kind of tool makes while it cuts: "snip" plays once per snip, any
+-- other name is looped as an engine. Kinds: "scissors", "push", "vehicle". To give one
+-- mower its own sound later, add the sound above and look it up by mower id here.
+G.MowSound = { scissors = "snip", default = "mow" }
+-- The part of the mower recording that is looped, in seconds (skips start-up and shut-down).
+G.MowLoop = { from = 15, to = 70 }
 
 return G

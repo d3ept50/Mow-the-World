@@ -377,9 +377,6 @@ local function connectRemotes()
 			first = first or pos
 			burst(pos, a.grass, 8)
 		end
-		if first and near(first, 50) then
-			UI.sfx("cut", rng:NextNumber(0.9, 1.25), 0.08)
-		end
 	end)
 
 	local lastGrass = 0
@@ -484,10 +481,12 @@ end
 ---------------------------------------------------------------- init
 local SHOP_PANEL = { Mowers = "Mowers", Bags = "Bags", Crates = "Crates", Vehicles = "Vehicles", Rebirth = "Rebirth", Diamonds = "Diamonds", Robux = "Robux" }
 
----------------------------------------------------------------- new player guide arrow
--- Brand-new players get an arrow over their head that points the way to the first area.
--- It leads to the start of the bridge first, then across it, and goes away on arrival.
-local guide -- { model, parts = { { part, offset } }, goal, bridgeStart, lastLook }
+---------------------------------------------------------------- guide arrow
+-- An arrow over the player's head. Red: the bag is full, so it points to where to sell.
+-- Green: it leads a brand-new player to the first area (bridge first, then across).
+-- The compass button in the HUD turns it off (UI.settings.arrow).
+local GUIDE_GREEN, GUIDE_RED = Color3.fromRGB(120, 255, 90), Color3.fromRGB(255, 70, 60)
+local guide = { model = nil, parts = nil, color = nil, newPlayer = false, bridgeStart = nil, lastLook = 0, sellTarget = nil }
 
 local function findBridgeStart()
 	for _, g in ipairs(CollectionService:GetTagged("Gate")) do
@@ -506,9 +505,9 @@ end
 local function startGuide()
 	local d = State.data
 	local cutSoFar = d.stats and d.stats.grassCut or 0
-	if d.areasUnlocked > 1 or d.rebirths > 0 or cutSoFar > 0 then
-		return
-	end
+	guide.newPlayer = d.areasUnlocked <= 1 and d.rebirths == 0 and cutSoFar == 0
+	guide.bridgeStart = findBridgeStart()
+
 	local model = Instance.new("Model")
 	model.Name = "GuideArrow"
 	local function piece(size, offset)
@@ -519,7 +518,6 @@ local function startGuide()
 		p.CanTouch = false
 		p.CastShadow = false
 		p.Material = Enum.Material.Neon
-		p.Color = Color3.fromRGB(120, 255, 90)
 		p.Size = size
 		p.Parent = model
 		return { p, offset }
@@ -532,44 +530,75 @@ local function startGuide()
 		local c = tip + dir
 		table.insert(parts, piece(V(0.7, 0.45, 2.2), CFrame.lookAt(c, c + dir)))
 	end
-	model.Parent = workspace
-	guide = { model = model, parts = parts, goal = Areas.List[1].center, bridgeStart = findBridgeStart(), lastLook = 0 }
+	guide.model, guide.parts = model, parts -- stays out of the workspace until it has a target
+end
+
+-- Where to sell from here: this area's pad, the market's sell shop, or (on a bridge)
+-- wherever the arrow was already heading.
+local function sellTarget(area)
+	local a = area and area >= 1 and Areas.List[area]
+	if a then
+		return a.sellPos
+	elseif area == 0 then
+		return Areas.Shops.Sell
+	end
+	return guide.sellTarget or Areas.Shops.Sell
 end
 
 local function updateGuide(t)
-	if not guide then
+	if not guide.model then
 		return
 	end
 	local area = player:GetAttribute("Area")
-	if area == 1 then
-		guide.model:Destroy()
-		guide = nil
+	if guide.newPlayer and area == 1 then
+		guide.newPlayer = false
 		Menus.notify("🌿 You made it! Walk over the grass to mow it, then sell it at the 💰 pad.", "good")
-		return
 	end
 	local char = player.Character
 	local head = char and char:FindFirstChild("Head")
-	if not head then
-		return
+	local d = State.data
+	local target, color
+	if head and UI.settings.arrow then
+		local pos = head.Position
+		if d.bagCount > 0 and d.bagCount >= State.bagCapacity() - 0.001 then
+			guide.sellTarget = sellTarget(area)
+			target, color = guide.sellTarget, GUIDE_RED
+		elseif guide.newPlayer then
+			if not guide.bridgeStart and t - guide.lastLook > 1 then
+				guide.lastLook = t
+				guide.bridgeStart = findBridgeStart()
+			end
+			local bs = guide.bridgeStart
+			target, color = Areas.List[1].center, GUIDE_GREEN
+			if bs and area == 0 and (V(pos.X, 0, pos.Z) - bs).Magnitude > 18 then
+				target = bs
+			end
+		end
+		if target then
+			local flat = V(target.X - pos.X, 0, target.Z - pos.Z)
+			if flat.Magnitude < 1 then
+				target = nil
+			else
+				local origin = pos + V(0, 4.2 + math.sin(t * 4) * 0.35, 0)
+				local base = CFrame.lookAt(origin, origin + flat.Unit)
+				for _, it in ipairs(guide.parts) do
+					it[1].CFrame = base * it[2]
+				end
+			end
+		end
 	end
-	if not guide.bridgeStart and t - guide.lastLook > 1 then
-		guide.lastLook = t
-		guide.bridgeStart = findBridgeStart()
+	if color ~= GUIDE_RED then
+		guide.sellTarget = nil
 	end
-	local pos = head.Position
-	local target = guide.goal
-	local bs = guide.bridgeStart
-	if bs and area == 0 and (V(pos.X, 0, pos.Z) - bs).Magnitude > 18 then
-		target = bs
+	if target and color ~= guide.color then
+		guide.color = color
+		for _, it in ipairs(guide.parts) do
+			it[1].Color = color
+		end
 	end
-	local flat = V(target.X - pos.X, 0, target.Z - pos.Z)
-	if flat.Magnitude < 1 then
-		return
-	end
-	local origin = pos + V(0, 4.2 + math.sin(t * 4) * 0.35, 0)
-	local base = CFrame.lookAt(origin, origin + flat.Unit)
-	for _, it in ipairs(guide.parts) do
-		it[1].CFrame = base * it[2]
+	local parent = target and workspace or nil
+	if guide.model.Parent ~= parent then
+		guide.model.Parent = parent
 	end
 end
 
