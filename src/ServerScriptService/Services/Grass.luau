@@ -350,6 +350,8 @@ function Grass.init()
 			return
 		end
 		clickUntil[player] = os.clock() + Game.Click.window
+		-- a counter other clients watch to play this player's scissors chop
+		player:SetAttribute("Swing", ((player:GetAttribute("Swing") or 0) + 1) % 1000)
 		local boosted = (lastHit[player] or 0) + 1 / (Data.mowStats(player).speed * Game.Click.mult)
 		nextHit[player] = math.min(nextHit[player] or 0, boosted)
 	end)

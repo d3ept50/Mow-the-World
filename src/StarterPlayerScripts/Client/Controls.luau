@@ -9,6 +9,7 @@ local RS = game:GetService("ReplicatedStorage")
 
 local Input = RS:WaitForChild("Remotes"):WaitForChild("Input")
 local Menus = require(script.Parent.Menus)
+local MowFx = require(script.Parent.MowFx)
 
 local Controls = {}
 
@@ -54,6 +55,7 @@ local function sendCut()
 	if now - lastCut >= CLICK_GAP then
 		lastCut = now
 		Input:FireServer("cut")
+		MowFx.swing(Players.LocalPlayer) -- chop the scissors straight away, without waiting for the server
 	end
 end
 

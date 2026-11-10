@@ -17,8 +17,49 @@ local BLADE_REST, BLADE_OPEN, BLADE_CLOSED = 0, 7, -8
 local ENGINE_VOLUME = 0.45
 local SNIP_VOLUME = 0.6
 
+-- a click with scissors chops the right arm down and back up
+local SWING_TIME = 0.24 -- seconds for the whole down-and-up
+local SWING_ANGLE = 50 -- degrees the arm drops at the bottom
+
 local rng = Random.new()
-local tracked = {} -- [Player] = { tool, kind, blades = { { weld, base, side } }, sound, phase, closed, angle, nextScan }
+local tracked = {} -- [Player] = { tool, kind, blades = { { weld, base, side } }, sound, phase, closed, angle, nextScan, lastSwing }
+local swings = {} -- [Player] = { t, joint, base } while an arm chop is playing
+
+-- Starts (or restarts) the arm chop for a player holding scissors. The local player calls
+-- this on every click; other players are started from their "Swing" attribute.
+function MowFx.swing(player: Player)
+	local entry = tracked[player]
+	if not entry or entry.kind ~= "scissors" then
+		return
+	end
+	local sw = swings[player]
+	if sw then
+		-- already chopping: if the arm is on its way up, send it back down from where it is
+		if sw.t > SWING_TIME / 2 then
+			sw.t = SWING_TIME - sw.t
+		end
+		return
+	end
+	local char = player.Character
+	local arm = char and char:FindFirstChild("RightUpperArm")
+	local joint = arm and arm:FindFirstChild("RightShoulder")
+	if joint and joint:IsA("Motor6D") then
+		swings[player] = { t = 0, joint = joint, base = joint.C0 }
+	end
+end
+
+local function updateSwings(dt: number)
+	for player, sw in pairs(swings) do
+		sw.t += dt
+		if sw.t >= SWING_TIME or not sw.joint.Parent then
+			sw.joint.C0 = sw.base
+			swings[player] = nil
+		else
+			local drop = SWING_ANGLE * math.sin(math.pi * sw.t / SWING_TIME)
+			sw.joint.C0 = sw.base * ANG(-rad(drop), 0, 0)
+		end
+	end
+end
 
 local function makeSound(parent: Instance, id: string, looped: boolean): Sound
 	local s = Instance.new("Sound")
@@ -127,6 +168,14 @@ local function update(dt: number)
 			tracked[player] = entry
 		end
 		if entry then
+			-- other players' clicks arrive as a counter that goes up by one each time
+			local swingCount = player:GetAttribute("Swing")
+			if swingCount ~= entry.lastSwing then
+				if entry.lastSwing ~= nil and player ~= Players.LocalPlayer then
+					MowFx.swing(player)
+				end
+				entry.lastSwing = swingCount
+			end
 			local mowing = player:GetAttribute("Mowing") == true
 			if entry.kind == "scissors" then
 				scissors(entry, mowing, dt)
@@ -135,11 +184,13 @@ local function update(dt: number)
 			end
 		end
 	end
+	updateSwings(dt)
 end
 
 function MowFx.init()
 	RunService.Heartbeat:Connect(update)
 	Players.PlayerRemoving:Connect(function(player)
+		swings[player] = nil
 		tracked[player] = nil
 	end)
 end

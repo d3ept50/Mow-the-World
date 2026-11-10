@@ -2,8 +2,8 @@
 -- grass) passes its colours and materials through here, so the style is tuned in one place.
 local Style = {}
 
-Style.SATURATION = 1.3 -- multiplies each colour's saturation
-Style.SATURATION_ADD = 0.06 -- then adds a little more
+Style.SATURATION = 1.15 -- multiplies each colour's saturation
+Style.SATURATION_ADD = 0.02 -- then adds a little more
 Style.BRIGHTNESS = 1.1 -- multiplies each colour's brightness
 Style.GREY_BELOW = 0.1 -- colours less saturated than this stay grey / white / black
 
@@ -15,8 +15,8 @@ Style.Lighting = {
 	brightness = 2.9,
 	exposure = 0.15,
 	shadowSoftness = 0.45,
-	saturation = 0.3,
-	contrast = 0.12,
+	saturation = 0.2,
+	contrast = 0.1,
 	gradeBrightness = 0.02,
 }
 Style.FOG = 0.7 -- multiplies each area's fog density (haze washes colours out)
