@@ -21,6 +21,7 @@ local Style = require(RS.Shared.Style)
 local State = require(script.Parent.State)
 local UI = require(script.Parent.UI)
 local Menus = require(script.Parent.Menus)
+local ChestSpin = require(script.Parent.ChestSpin)
 local Remotes = RS.Remotes
 
 local player = Players.LocalPlayer
@@ -553,7 +554,12 @@ local function connectRemotes()
 		Menus.confetti()
 	end)
 
-	Remotes.ChestFx.OnClientEvent:Connect(function(kind, pos, id)
+	Remotes.ChestFx.OnClientEvent:Connect(function(kind, pos, id, spin)
+		if kind == "spin" then
+			-- my own chest: the server has already decided the prizes, this plays the reel
+			ChestSpin.play(id, chestColor(id), spin)
+			return
+		end
 		if not near(pos, 200) then
 			return
 		end

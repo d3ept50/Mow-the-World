@@ -42,6 +42,14 @@ local MENU_COLORS = {
 Menus.COLORS = MENU_COLORS
 
 ---------------------------------------------------------------- notifications & banners
+-- While something fills the middle of the screen (the chest reel), messages move to the
+-- bottom edge so they can still be read and do not cover it.
+function Menus.toastsLow(on: boolean)
+	if refs.notes then
+		refs.notes.Position = on and UDim2.new(0.5, 0, 1, -118) or UDim2.new(0.5, 0, 0, 132)
+	end
+end
+
 local NOTE_COLORS = { info = T.text, good = T.green, bad = T.red, big = T.gold, rebirth = T.purple }
 
 function Menus.notify(text: string, kind: string?)
