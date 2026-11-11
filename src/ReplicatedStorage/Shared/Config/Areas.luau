@@ -29,7 +29,7 @@ Areas.MILESTONE_CASH = { 150, 400, 900, 2500 } -- x grass value
 -- Boss fights happen in a separate arena, one per fight, built far away from the islands.
 Areas.BOSS_ZONE = Areas.ARENA_RADIUS + 2 -- stepping this close to a boss opens the fight prompt
 -- The boss portal: a green circle in front of the castle gate in town. Standing on it opens
--- a menu to fight any boss the player has unlocked, alone or with the rest of the server.
+-- the world boss menu: one boss the whole server fights together.
 Areas.PORTAL_POS = Vector3.new(0, 0, -172)
 Areas.PORTAL_RADIUS = 13
 Areas.FIGHT_RADIUS = 58 -- size of the fight arena
@@ -159,6 +159,29 @@ for i, def in ipairs(DEFS) do
 	Areas.CellMap[cell[1] .. "," .. cell[2]] = i
 end
 Areas.COUNT = #Areas.List
+
+-- The world boss and its arena. It is kept under its own number so everything that looks
+-- an area up by number (names, colours, sky, boss size and attacks) works for it too, but
+-- it is not one of the islands: loops over the areas never see it.
+Areas.WORLD_ID = 99
+Areas.WORLD_CENTER = Vector3.new(0, 300, 6400)
+Areas.WORLD_RADIUS = 96
+do
+	local w = table.clone(Areas.List[Areas.COUNT])
+	w.id = Areas.WORLD_ID
+	w.name = "Overgrown Colosseum"
+	w.grass, w.cut, w.ground, w.wall, w.mat = rgb(120, 255, 110), rgb(52, 56, 60), rgb(70, 128, 66), rgb(128, 132, 128), "Slate"
+	w.sky = { clock = 16.4, ambient = rgb(150, 176, 152), fog = rgb(120, 170, 130), density = 0.24, tint = rgb(226, 255, 230) }
+	w.center = Areas.WORLD_CENTER
+	w.bossPos = Areas.WORLD_CENTER
+	w.boss = {
+		name = "Overgrowth King", body = "block", color = rgb(52, 84, 58), color2 = rgb(150, 255, 90), mat = "Slate", feature = "crown", size = 22,
+		hp = 0, cash = 0, diamonds = 0, attack = 0, -- health and rewards are worked out in Boss from the players who join
+		moves = { "slam", "barrage", "smash", "spin", "charge", "roar", "quake", "snipe", "swipe", "barrage", "smash", "quake" },
+		speed = 24, tempo = 2.3,
+	}
+	Areas.List[Areas.WORLD_ID] = w
+end
 
 -- Grass tiles to clear in an area for its n-th milestone reward.
 function Areas.milestoneGoal(areaId: number, n: number): number?

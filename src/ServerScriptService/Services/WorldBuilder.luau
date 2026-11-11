@@ -1151,7 +1151,7 @@ local function buildMarket(world)
 		end
 		local sign = deco(portal, V(1, 1, 1), pp + V(0, 13, 0), WHITE)
 		sign.Transparency = 1
-		billboard(sign, "⚔️ BOSS PORTAL\nFight any boss you have unlocked", 30, 7, 0, green)
+		billboard(sign, "🌍 WORLD BOSS\nThe whole server fights together", 30, 7, 0, green)
 		portal.Parent = m
 	end
 
