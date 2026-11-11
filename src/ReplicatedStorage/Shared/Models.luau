@@ -227,18 +227,30 @@ function Models.mower(id: string): Model
 		-- use the imported Blender model for this mower if it is in ReplicatedStorage.Assets
 		local asset = Assets.clone(Assets.MOWERS[id])
 		if asset then
-			-- handle height 2.75, wheels on the ground, handle just in front of the player
-			Assets.fit(asset, "Y", 2.75)
-			local lo, hi = Assets.bounds(asset)
-			Assets.moveBy(asset, V(-(lo.X + hi.X) / 2, -lo.Y, 1.2 - hi.Z))
-			grips(m, 0.5, 2.66, 1.1) -- the grip bar is at the top back of the model
+			local ride = Assets.RIDE[Assets.MOWERS[id]]
+			local scale = L.scale or 1
+			if ride then
+				-- a mower the player sits on: sized by its width, hands on the steering wheel
+				Assets.fit(asset, "X", ride.width)
+				local lo, hi = Assets.bounds(asset)
+				Assets.moveBy(asset, V(-(lo.X + hi.X) / 2, -lo.Y, -ride.front - lo.Z))
+				grips(m, ride.wheel.X, ride.wheel.Y, ride.wheel.Z)
+				scale /= ride.scale
+				m:SetAttribute("RideSeat", ride.seat * scale)
+			else
+				-- handle height 2.75, wheels on the ground, handle just in front of the player
+				Assets.fit(asset, "Y", 2.75)
+				local lo, hi = Assets.bounds(asset)
+				Assets.moveBy(asset, V(-(lo.X + hi.X) / 2, -lo.Y, 1.2 - hi.Z))
+				grips(m, 0.5, 2.66, 1.1) -- the grip bar is at the top back of the model
+			end
 			for _, d in ipairs(asset:GetDescendants()) do
 				if d:IsA("BasePart") then
 					d.Parent = m
 				end
 			end
 			asset:Destroy()
-			m:ScaleTo(L.scale or 1)
+			m:ScaleTo(scale)
 			return m
 		end
 		local w = L.wide and 3.1 or 2.2
@@ -249,10 +261,19 @@ function Models.mower(id: string): Model
 			for _, z in ipairs({ -0.8, -2.8 }) do
 				P(m, V(0.3, 0.85, 0.85), CF(sx * (w / 2 + 0.12), 0.43, z), DARK, nil, "Cylinder")
 			end
-			P(m, V(0.12, 0.12, 2.5), CF(sx * 0.8, 1.75, 0.35) * ANG(rad(-52), 0, 0), GREY, "Metal")
+			if not L.seat then
+				P(m, V(0.12, 0.12, 2.5), CF(sx * 0.8, 1.75, 0.35) * ANG(rad(-52), 0, 0), GREY, "Metal")
+			end
 		end
-		P(m, V(1.9, 0.16, 0.16), CF(0, 2.72, 1.1), L.accent)
-		grips(m, 0.7, 2.72, 1.1)
+		if L.seat then
+			-- ridden, not pushed: a steering wheel in front of the seat instead of a push handle
+			P(m, V(0.12, 0.95, 0.12), CF(0, 1.5, -2.0) * ANG(rad(-35), 0, 0), GREY, "Metal")
+			P(m, V(0.1, 0.8, 0.8), CF(0, 1.92, -1.78) * ANG(rad(-35), 0, 0) * ANG(0, rad(90), 0), DARK, nil, "Cylinder")
+			grips(m, 0.3, 1.92, -1.75)
+		else
+			P(m, V(1.9, 0.16, 0.16), CF(0, 2.72, 1.1), L.accent)
+			grips(m, 0.7, 2.72, 1.1)
+		end
 		if L.engine then
 			local ez = L.seat and -2.5 or -1.9
 			if L.twin then
@@ -295,6 +316,10 @@ function Models.mower(id: string): Model
 			P(m, V(0.15, 0.2, 2.8), CF(-w / 2 - 0.05, 0.9, -1.8), L.glow, "Neon")
 			glow(deck, L.glow, 12, 10)
 		end
+	end
+	if L.seat then
+		-- top of the seat cushion: Character sits the player here (see P(...) for the seat above)
+		m:SetAttribute("RideSeat", V(0, 1.2, -1.1) * (L.scale or 1))
 	end
 	m:ScaleTo(L.scale or 1)
 	return m

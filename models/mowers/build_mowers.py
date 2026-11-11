@@ -5,8 +5,9 @@ Outputs (next to this script): mower_<name>.fbx x4, mowers.blend,
 preview_front.png, preview_rear.png
 
 Each mower is a Body mesh plus four separate wheels and a Blade, so they can spin later.
-Units: 1 Blender unit = 1 stud. Front faces +Y. The push handle is always the tallest
-and rearmost part: the game sizes the model by its height and puts the hands on the bar.
+Units: 1 Blender unit = 1 stud. Front faces +Y. On the pushed mowers the handle is always
+the tallest and rearmost part: the game sizes the model by its height and puts the hands
+on the bar. The Ride-On is sat on instead and has no handle.
 """
 import math
 import os
@@ -236,7 +237,8 @@ def professional():
 
 def ride_on():
     """A small lawn tractor: red hood, seat, steering wheel, big rear wheels, mid deck.
-    It keeps a push handle at the back because mowers are pushed in the game for now."""
+    The player sits on it in the game, so it has no push handle. Its seat, steering wheel
+    and size are described to the game in Assets.RIDE (src/ReplicatedStorage/Shared)."""
     RED, SEAT, LAMP = "#C82828", "#26272B", "#FFF3B0"
     b = [
         box((2.0, 4.6, 0.45), (0, 0.3, 1.05), DARK, bevel=0.08),          # chassis
@@ -264,7 +266,6 @@ def ride_on():
     tilt = (math.radians(55), 0, 0)
     b.append(cyl(0.48, 0.08, (0, 0.02, 2.74), BLACK, verts=18, rot=tilt))
     b.append(cyl(0.12, 0.12, (0, 0.02, 2.74), METAL, verts=10, rot=tilt))
-    handle(b, 0.8, (-2.05, 1.6), (-3.2, 3.75), brace=False)
     ws = wheels([("FL", -1.25, 2.0, 0.5, 0.42, WHITE), ("FR", 1.25, 2.0, 0.5, 0.42, WHITE),
                  ("RL", -1.55, -1.3, 0.85, 0.62, WHITE), ("RR", 1.55, -1.3, 0.85, 0.62, WHITE)])
     bl = join("Blade", [

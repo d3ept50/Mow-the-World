@@ -21,18 +21,25 @@ local function attach(model, bodyPart, cf, char)
 	model.Parent = char
 end
 
--- Roblox's own "holding a tool" pose: the right arm held out in front.
-local HOLD_ANIM = {
-	[Enum.HumanoidRigType.R15] = "rbxassetid://507768375",
-	[Enum.HumanoidRigType.R6] = "rbxassetid://182393478",
+-- Roblox's own poses, played over the walking animation:
+--   hold = "holding a tool", the right arm held out in front (scissors)
+--   sit  = sitting, for mowers the player rides
+local POSES = {
+	hold = { [Enum.HumanoidRigType.R15] = "rbxassetid://507768375", [Enum.HumanoidRigType.R6] = "rbxassetid://182393478" },
+	sit = { [Enum.HumanoidRigType.R15] = "rbxassetid://2506281703", [Enum.HumanoidRigType.R6] = "rbxassetid://178130996" },
 }
-local holdTracks = setmetatable({}, { __mode = "k" }) -- [character] = AnimationTrack
+local poseTracks = setmetatable({}, { __mode = "k" }) -- [character] = { [pose] = AnimationTrack }
 
-local function setHolding(char, hum, on)
-	local track = holdTracks[char]
-	if on and not track then
+-- Plays one pose (or none, when pose is nil) and stops the others.
+local function setPose(char, hum, pose)
+	local tracks = poseTracks[char]
+	if not tracks then
+		tracks = {}
+		poseTracks[char] = tracks
+	end
+	if pose and not tracks[pose] then
 		local animator = hum:FindFirstChildOfClass("Animator")
-		local id = HOLD_ANIM[hum.RigType]
+		local id = POSES[pose][hum.RigType]
 		if animator and id then
 			local anim = Instance.new("Animation")
 			anim.AnimationId = id
@@ -42,26 +49,53 @@ local function setHolding(char, hum, on)
 			if ok and loaded then
 				loaded.Priority = Enum.AnimationPriority.Action
 				loaded.Looped = true
-				holdTracks[char] = loaded
-				track = loaded
+				tracks[pose] = loaded
 			end
 		end
 	end
-	if track then
-		if on and not track.IsPlaying then
-			track:Play(0.15)
-		elseif not on and track.IsPlaying then
+	for name, track in pairs(tracks) do
+		if name == pose then
+			if not track.IsPlaying then
+				track:Play(0.15)
+			end
+		elseif track.IsPlaying then
 			track:Stop(0.15)
 		end
 	end
+end
+
+-- Sitting on a mower: the seat is usually higher or lower than the player's hips, so the
+-- character's hip height is changed to match it and put back when they get off.
+-- height = how far the bottom of the root part should be above the ground, or nil to restore.
+local function setHip(hum, height)
+	local last = hum:GetAttribute("RideHip")
+	if not last or math.abs(hum.HipHeight - last) > 0.01 then
+		-- the current value was not set here (first time, or Roblox rescaled the avatar)
+		hum:SetAttribute("BaseHip", hum.HipHeight)
+	end
+	local target = hum:GetAttribute("BaseHip")
+	if height then
+		-- R15 hip height is measured from the ground; R6 is an offset on top of 2-stud legs
+		target = hum.RigType == Enum.HumanoidRigType.R15 and height or height - 2
+	end
+	hum.HipHeight = target
+	hum:SetAttribute("RideHip", target)
+end
+
+-- Where the ground is, measured down from the middle of the root part.
+local function groundOffset(hum, hrp)
+	if hum.RigType == Enum.HumanoidRigType.R15 then
+		return -(hum.HipHeight + hrp.Size.Y / 2)
+	end
+	return -(3 + hum.HipHeight)
 end
 
 -- Where the scissors are gripped, in the model's own space before scaling: between the
 -- two handle blocks (see Models.mower).
 local SCISSOR_GRIP = Vector3.new(0, 1.04, 0.1)
 
--- Puts hand-held scissors in the right hand, lined up like a Roblox tool, and raises the
--- arm. Returns false if this character has no right hand to hold them.
+-- Puts hand-held scissors in the right hand, lined up like a Roblox tool. Returns false
+-- if this character has no right hand to hold them.
 local function holdScissors(model, char, hum)
 	local hand = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
 	local grip = hand and hand:FindFirstChild("RightGripAttachment")
@@ -69,7 +103,6 @@ local function holdScissors(model, char, hum)
 		return false
 	end
 	attach(model, hand, grip.WorldCFrame * CF(-SCISSOR_GRIP * model:GetScale()), char)
-	setHolding(char, hum, true)
 	return true
 end
 
@@ -121,8 +154,9 @@ function Character.updateSpeed(player: Player)
 	end
 end
 
--- Puts both hands on a pushed mower's handle. An IKControl bends each arm so the hand
--- stays on its grip point whatever the walking animation is doing. (R15 avatars only.)
+-- Puts both hands on a mower's grip points: the handle of a pushed mower, or the steering
+-- wheel of a ridden one. An IKControl bends each arm so the hand stays on its grip point
+-- whatever animation is playing. (R15 avatars only.)
 local GRIPS = {
 	{ grip = "GripL", hand = "LeftHand", arm = "LeftUpperArm" },
 	{ grip = "GripR", hand = "RightHand", arm = "RightUpperArm" },
@@ -172,27 +206,36 @@ function Character.refresh(player: Player)
 		end
 	end
 	releaseHandle(hum)
-	local ground = hum.RigType == Enum.HumanoidRigType.R15 and -(hum.HipHeight + hrp.Size.Y / 2) or -3
 	local v = Data.ridingVehicle(player)
-	local holding = false
+	local model, seat
+	if not v then
+		local id = Data.ownsMower(player, pr.equippedMower) and pr.equippedMower or "Scissors"
+		model = Models.mower(id)
+		seat = model:GetAttribute("RideSeat") -- set on mowers the player sits on
+	end
+	-- sitting puts the bottom of the root part about half a stud above the seat cushion
+	setHip(hum, seat and seat.Y + 0.5 or nil)
+	local ground = groundOffset(hum, hrp)
+	local pose = nil
 	if v then
 		attach(Models.vehicle(v.id), hrp, hrp.CFrame * CF(0, ground, 0), char)
-	else
-		local id = Data.ownsMower(player, pr.equippedMower) and pr.equippedMower or "Scissors"
-		local model = Models.mower(id)
-		if model:GetAttribute("Kind") == "scissors" then
-			holding = holdScissors(model, char, hum)
-			if not holding then
-				attach(model, hrp, hrp.CFrame * CF(0.95, -1.5, -0.7), char)
-			end
+	elseif model:GetAttribute("Kind") == "scissors" then
+		if holdScissors(model, char, hum) then
+			pose = "hold"
 		else
-			attach(model, hrp, hrp.CFrame * CF(0, ground, -1.3), char)
-			holdHandle(model, char, hum)
+			attach(model, hrp, hrp.CFrame * CF(0.95, -1.5, -0.7), char)
 		end
+	elseif seat then
+		-- ridden: the seat goes under the player, who sits with both hands on the wheel
+		attach(model, hrp, hrp.CFrame * CF(-seat.X, ground, -seat.Z), char)
+		holdHandle(model, char, hum)
+		pose = "sit"
+	else
+		-- pushed: the mower goes in front, with both hands on its handle
+		attach(model, hrp, hrp.CFrame * CF(0, ground, -1.3), char)
+		holdHandle(model, char, hum)
 	end
-	if not holding then
-		setHolding(char, hum, false)
-	end
+	setPose(char, hum, pose)
 	Character.updateSpeed(player)
 	updateTag(player, char, pr)
 end

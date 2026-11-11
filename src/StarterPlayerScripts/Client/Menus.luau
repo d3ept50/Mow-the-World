@@ -30,7 +30,7 @@ Menus.MENU = {
 -- Everything else lives behind the Menu button (and at the shops in the marketplace).
 Menus.MORE = {
 	{ "📦", "Crates", "Crates" }, { "✂️", "Mowers", "Mowers" }, { "🎒", "Bags", "Bags" },
-	{ "🚜", "Vehicles", "Vehicles" }, { "🔁", "Rebirth", "Rebirth" }, { "💎", "Diamonds", "Diamonds" },
+	{ "🔁", "Rebirth", "Rebirth" }, { "💎", "Diamonds", "Diamonds" },
 	{ "🏆", "Awards", "Achievements" }, { "🧳", "Items", "Inventory" }, { "⚙️", "Settings", "Settings" },
 }
 

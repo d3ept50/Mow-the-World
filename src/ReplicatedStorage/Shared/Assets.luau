@@ -22,6 +22,23 @@ Assets.MOWERS = {
 	RideOn = "mower_rideon",
 }
 
+-- Imported mowers the player sits on instead of pushing. All numbers are in the model's
+-- own studs, measured from the middle of the model on the ground, with +Z towards the back:
+--   width  = full width across the rear wheels (the game sizes the model by this)
+--   front  = distance from the middle to the front bumper
+--   seat   = top of the seat cushion, where the player sits
+--   wheel  = where the right hand holds the steering wheel (the left hand mirrors it)
+--   scale  = the mower's look.scale in Config.Items at which the model is this size
+Assets.RIDE = {
+	mower_rideon = {
+		width = 3.84,
+		front = 2.83,
+		seat = Vector3.new(0, 2.03, 1.0),
+		wheel = Vector3.new(0.4, 2.74, -0.02),
+		scale = 1.35,
+	},
+}
+
 -- Blender exports arrive facing backwards (Roblox "front" is -Z), so every imported model
 -- is turned half a turn. To turn one model differently, give its angle in degrees here.
 Assets.DEFAULT_YAW = 180
