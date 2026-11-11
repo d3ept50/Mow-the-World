@@ -121,6 +121,39 @@ function Character.updateSpeed(player: Player)
 	end
 end
 
+-- Puts both hands on a pushed mower's handle. An IKControl bends each arm so the hand
+-- stays on its grip point whatever the walking animation is doing. (R15 avatars only.)
+local GRIPS = {
+	{ grip = "GripL", hand = "LeftHand", arm = "LeftUpperArm" },
+	{ grip = "GripR", hand = "RightHand", arm = "RightUpperArm" },
+}
+
+local function releaseHandle(hum)
+	for _, c in ipairs(hum:GetChildren()) do
+		if c:IsA("IKControl") and c.Name == "MowerGrip" then
+			c:Destroy()
+		end
+	end
+end
+
+local function holdHandle(model, char, hum)
+	local root = model.PrimaryPart
+	for _, g in ipairs(GRIPS) do
+		local target = root and root:FindFirstChild(g.grip)
+		local hand, arm = char:FindFirstChild(g.hand), char:FindFirstChild(g.arm)
+		if target and hand and arm then
+			local ik = Instance.new("IKControl")
+			ik.Name = "MowerGrip"
+			ik.Type = Enum.IKControlType.Position
+			ik.ChainRoot = arm
+			ik.EndEffector = hand
+			ik.Target = target
+			ik.SmoothTime = 0
+			ik.Parent = hum
+		end
+	end
+end
+
 function Character.refresh(player: Player)
 	local pr = Data.get(player)
 	local char = player.Character
@@ -138,6 +171,7 @@ function Character.refresh(player: Player)
 			old:Destroy()
 		end
 	end
+	releaseHandle(hum)
 	local ground = hum.RigType == Enum.HumanoidRigType.R15 and -(hum.HipHeight + hrp.Size.Y / 2) or -3
 	local v = Data.ridingVehicle(player)
 	local holding = false
@@ -153,6 +187,7 @@ function Character.refresh(player: Player)
 			end
 		else
 			attach(model, hrp, hrp.CFrame * CF(0, ground, -1.3), char)
+			holdHandle(model, char, hum)
 		end
 	end
 	if not holding then

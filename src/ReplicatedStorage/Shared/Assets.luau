@@ -15,8 +15,9 @@ local Assets = {}
 -- Which imported model each mower id uses.
 Assets.MOWERS = { Push = "mower" }
 
--- If an imported model faces the wrong way in game, turn it here (degrees, by asset name).
--- Models are expected to face Roblox "front" (-Z).
+-- Blender exports arrive facing backwards (Roblox "front" is -Z), so every imported model
+-- is turned half a turn. To turn one model differently, give its angle in degrees here.
+Assets.DEFAULT_YAW = 180
 Assets.YAW = {}
 
 local function find(name: string): Instance?
@@ -63,8 +64,8 @@ function Assets.clone(name: string?): Model?
 		model:Destroy()
 		return nil
 	end
-	local yaw = Assets.YAW[string.lower(name :: string)]
-	if yaw then
+	local yaw = Assets.YAW[string.lower(name :: string)] or Assets.DEFAULT_YAW
+	if yaw ~= 0 then
 		model:PivotTo(model:GetPivot() * CFrame.Angles(0, math.rad(yaw), 0))
 	end
 	return model

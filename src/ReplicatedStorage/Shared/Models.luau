@@ -56,6 +56,18 @@ local function rootPart(model)
 	return r
 end
 
+-- Marks where the two hands hold a pushed mower's handle. x = half the distance between
+-- the hands; y, z = the handle's position in the model. Character puts the hands there.
+local function grips(model, x, y, z)
+	local root = model.PrimaryPart
+	for name, side in pairs({ GripL = -1, GripR = 1 }) do
+		local a = Instance.new("Attachment")
+		a.Name = name
+		a.Position = root.CFrame:PointToObjectSpace(V(side * x, y, z))
+		a.Parent = root
+	end
+end
+
 local function glow(part, color, range, particles)
 	local l = Instance.new("PointLight")
 	l.Color = color
@@ -219,6 +231,7 @@ function Models.mower(id: string): Model
 			Assets.fit(asset, "Y", 2.75)
 			local lo, hi = Assets.bounds(asset)
 			Assets.moveBy(asset, V(-(lo.X + hi.X) / 2, -lo.Y, 1.2 - hi.Z))
+			grips(m, 0.5, 2.66, 1.1) -- the grip bar is at the top back of the model
 			for _, d in ipairs(asset:GetDescendants()) do
 				if d:IsA("BasePart") then
 					d.Parent = m
@@ -239,6 +252,7 @@ function Models.mower(id: string): Model
 			P(m, V(0.12, 0.12, 2.5), CF(sx * 0.8, 1.75, 0.35) * ANG(rad(-52), 0, 0), GREY, "Metal")
 		end
 		P(m, V(1.9, 0.16, 0.16), CF(0, 2.72, 1.1), L.accent)
+		grips(m, 0.7, 2.72, 1.1)
 		if L.engine then
 			local ez = L.seat and -2.5 or -1.9
 			if L.twin then
