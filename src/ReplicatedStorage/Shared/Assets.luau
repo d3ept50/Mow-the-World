@@ -6,6 +6,7 @@
 --
 -- Expected names in the Assets folder (capital letters don't matter):
 --   mower            <- models/mower/mower.fbx      (the Basic Push Mower)
+--   mower_electric, mower_petrol, mower_pro, mower_rideon   <- models/mowers/
 --   chest_common     <- models/chests/chest_common.fbx
 --   chest_uncommon, chest_rare, chest_epic, chest_legendary
 local RS = game:GetService("ReplicatedStorage")
@@ -13,7 +14,13 @@ local RS = game:GetService("ReplicatedStorage")
 local Assets = {}
 
 -- Which imported model each mower id uses.
-Assets.MOWERS = { Push = "mower" }
+Assets.MOWERS = {
+	Push = "mower",
+	Electric = "mower_electric",
+	Petrol = "mower_petrol",
+	Pro = "mower_pro",
+	RideOn = "mower_rideon",
+}
 
 -- Blender exports arrive facing backwards (Roblox "front" is -Z), so every imported model
 -- is turned half a turn. To turn one model differently, give its angle in degrees here.

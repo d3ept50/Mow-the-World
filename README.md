@@ -44,6 +44,7 @@ rojo syncback --input Place3.rbxl
 Each model folder has a Python build script, a `.blend` file, `.fbx` exports and preview images.
 
 - `models/mower/` — low-poly push mower. Wheels and blade are separate meshes so they can spin.
+- `models/mowers/` — the Electric, Petrol, Professional and Ride-On mowers, built by one script.
 - `models/chests/` — five treasure chests (Common, Uncommon, Rare, Epic, Legendary). Each is a `Base` and a `Lid`; the lid pivots on its back hinge.
 
 To rebuild a model after editing its script:
@@ -64,6 +65,10 @@ Rojo cannot sync meshes, so each model is imported once by hand:
 | File | Name in Assets | Used for |
 |---|---|---|
 | `models/mower/mower.fbx` | `mower` | Basic Push Mower |
+| `models/mowers/mower_electric.fbx` | `mower_electric` | Electric Mower |
+| `models/mowers/mower_petrol.fbx` | `mower_petrol` | Petrol Mower |
+| `models/mowers/mower_pro.fbx` | `mower_pro` | Professional Mower |
+| `models/mowers/mower_rideon.fbx` | `mower_rideon` | Ride-On Mower |
 | `models/chests/chest_common.fbx` | `chest_common` | Common chest |
 | `models/chests/chest_uncommon.fbx` | `chest_uncommon` | Uncommon chest |
 | `models/chests/chest_rare.fbx` | `chest_rare` | Rare chest |
