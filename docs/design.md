@@ -29,7 +29,7 @@ A Roblox mowing simulator built in Place3.rbxl (local, unpublished). Players cut
 
 - An archipelago: a central marketplace island (680 studs wide) and twelve 280-stud area islands around it on a 4×4 grid. Islands sit 400 studs apart, so there are 120 studs of sea between them.
 - Wooden bridges join the marketplace to its neighbours and each area to the next. A locked gate (force field) stands at the far end of each bridge until the previous boss is beaten.
-- Each area has a 26×26 grass field (6-stud tiles), a boss arena, a sell pad, fences, themed props and a landmark.
+- Each area has a 26×26 grass field (6-stud tiles), a boss circle, a sell pad, fences, themed props and a landmark.
 - The marketplace has a fountain, nine shops in a ring, stone paths to every bridge, eight cottages, lamps, benches, bunting and wandering NPCs.
 - Terrain (islands, beaches, sea) is baked into the place file and only re-bakes when `LAYOUT_VERSION` in WorldBuilder changes. Smooth terrain renders 2 studs above the filled volume, so islands are filled to y = -2.3 and parts are built at y = 0.
 - Everything else is rebuilt by `WorldBuilder.build()` on every server start.
@@ -53,9 +53,12 @@ Grass HP = 5 × 5^(n−1). Grass value = 4^(n−1). Boss HP = grass HP × 120, b
 | 11 | Divine Gardens | Seraph Guardian | Marble temple |
 | 12 | Cosmic Dimension | Void Emperor | Void portal |
 
-- **Completion milestones:** 25 / 50 / 75 / 100% pay 150 / 400 / 900 / 2,500 × grass value. 100% also gives a crate.
+- **Grass rewards:** clearing 250 / 500 / 1,000 / 2,000 grass tiles in area 1 pays 150 / 400 / 900 / 2,500 × grass value; the last one also gives a crate. Each later area needs 50% more grass (area 2: 375, 750, 1,500, 3,000). Settings are in `Config.Areas` (`MILESTONES`, `MILESTONE_GROWTH`).
 - **Regrowth:** grass regrows after 16 seconds.
-- **Boss fights:** last 120 seconds. Each extra player adds 60% boss HP. Attacks cycle between slam, targeted strike and spin.
+- **Boss fights:** walking into a boss's circle opens a prompt: Solo, Invite friends (everyone on the server who has the area unlocked gets 15 seconds to join) or Exit. Each fight gets its own arena, built far from the islands, and its players are teleported there and back. Fights last 120 seconds and each extra player adds 60% boss HP.
+- **Boss attacks:** the boss walks around the arena and repeats its own attack sequence (`BOSS_MOVES` and `Areas.Moves` in `Config.Areas`). Attacks only hit workers, never players. Boss attack = 6 × grass value per hit.
+- **Worker health:** 10 × power. A worker at 0 health is knocked out until the fight ends.
+- **Teleport:** the Teleport menu jumps to the marketplace or any unlocked area (3 second cooldown).
 
 ## Items
 

@@ -16,8 +16,50 @@ Areas.RESPAWN = 16 -- seconds for grass to regrow
 Areas.BOSS_OFFSET = Vector3.new(97, 0, 97)
 Areas.SELL_OFFSET = Vector3.new(-99, 0, -99)
 Areas.ARENA_RADIUS = 21
-Areas.MILESTONES = { 25, 50, 75, 100 }
+-- Grass milestones: clear this many grass tiles in an area to earn each reward.
+-- These are the goals for area 1; every later area needs MILESTONE_GROWTH x more per area.
+Areas.MILESTONES = { 250, 500, 1000, 2000 }
+Areas.MILESTONE_GROWTH = 0.5
 Areas.MILESTONE_CASH = { 150, 400, 900, 2500 } -- x grass value
+
+-- Boss fights happen in a separate arena, one per fight, built far away from the islands.
+Areas.BOSS_ZONE = Areas.ARENA_RADIUS + 2 -- stepping this close to a boss opens the fight prompt
+Areas.FIGHT_RADIUS = 58 -- size of the fight arena
+Areas.FIGHT_ORIGIN = Vector3.new(0, 300, 5000) -- first arena; more are placed along +X
+Areas.FIGHT_SPACING = 420
+
+-- Boss attacks. rule = which of each player's workers are hit:
+--   front (the first `count` still standing), random (`count` at random), half, all,
+--   strongest, weakest, none.
+-- mult = damage as a multiple of the boss's attack. windup = warning time in seconds.
+-- repeats = hits in a row. rage = the boss's next attack is multiplied by this.
+Areas.Moves = {
+	swipe = { label = "Swipe", icon = "💥", rule = "front", count = 2, mult = 1, windup = 0.7 },
+	slam = { label = "Ground Slam", icon = "🌋", rule = "all", mult = 0.6, windup = 0.9 },
+	spin = { label = "Whirlwind", icon = "🌀", rule = "all", mult = 0.45, windup = 0.6 },
+	charge = { label = "Charge", icon = "🐗", rule = "half", mult = 0.9, windup = 0.8 },
+	smash = { label = "Crushing Blow", icon = "🔨", rule = "strongest", mult = 2.2, windup = 1.1 },
+	snipe = { label = "Cull the Weak", icon = "🎯", rule = "weakest", mult = 1.6, windup = 0.7 },
+	barrage = { label = "Barrage", icon = "☄️", rule = "random", count = 1, mult = 0.7, windup = 0.5, repeats = 3 },
+	quake = { label = "Earthquake", icon = "🪨", rule = "all", mult = 0.85, windup = 1.6 },
+	roar = { label = "Enrage", icon = "😡", rule = "none", mult = 0, windup = 0.8, rage = 1.6 },
+}
+
+-- Every boss repeats its own sequence of attacks.
+local BOSS_MOVES = {
+	{ "swipe", "slam", "swipe", "spin" }, -- Dandelion Brute
+	{ "barrage", "swipe", "slam" }, -- Sunflower Titan
+	{ "smash", "quake", "swipe", "smash" }, -- Elder Treant
+	{ "charge", "snipe", "swipe", "charge", "barrage" }, -- Scorpion King
+	{ "roar", "slam", "smash", "spin" }, -- Frost Yeti
+	{ "slam", "slam", "spin", "charge" }, -- Gummy Golem
+	{ "quake", "barrage", "roar", "smash" }, -- Magma Lord
+	{ "barrage", "barrage", "snipe", "spin" }, -- Sludge Hydra
+	{ "smash", "charge", "quake", "snipe" }, -- Crystal Colossus
+	{ "charge", "snipe", "charge", "roar", "spin" }, -- Nebula Wraith
+	{ "roar", "quake", "smash", "barrage", "slam" }, -- Seraph Guardian
+	{ "roar", "charge", "quake", "snipe", "barrage", "smash" }, -- Void Emperor
+}
 
 local function rgb(r, g, b)
 	return Color3.fromRGB(r, g, b)
@@ -99,12 +141,37 @@ for i, def in ipairs(DEFS) do
 	def.boss.hp = def.grassHP * 120
 	def.boss.cash = def.grassValue * 1500
 	def.boss.diamonds = 5 + 3 * i
+	def.boss.attack = 6 * def.grassValue -- damage of one hit on a worker (x the attack's mult)
+	def.boss.moves = BOSS_MOVES[i] or BOSS_MOVES[1]
+	def.boss.speed = 11 + i -- walking speed in the arena (studs per second)
+	def.boss.tempo = math.max(2.4, 4.2 - 0.15 * i) -- seconds between attacks
 	def.bossPos = def.center + Areas.BOSS_OFFSET
 	def.sellPos = def.center + Areas.SELL_OFFSET
 	Areas.List[i] = def
 	Areas.CellMap[cell[1] .. "," .. cell[2]] = i
 end
 Areas.COUNT = #Areas.List
+
+-- Grass tiles to clear in an area for its n-th milestone reward.
+function Areas.milestoneGoal(areaId: number, n: number): number?
+	local base = Areas.MILESTONES[n]
+	return base and math.floor(base * (1 + Areas.MILESTONE_GROWTH * (areaId - 1)) + 0.5) or nil
+end
+
+-- Where a player lands when they teleport to an area (0 = marketplace): beside its sell pad.
+function Areas.teleportPos(areaId: number): Vector3
+	local a = Areas.List[areaId]
+	if not a then
+		return Vector3.new(0, 6, 26)
+	end
+	return a.sellPos + Vector3.new(9, 5, 9)
+end
+
+-- Where a player is put back after a boss fight: just outside the boss's circle.
+function Areas.bossReturnPos(areaId: number): Vector3
+	local a = Areas.List[areaId]
+	return a.bossPos + (a.center - a.bossPos).Unit * (Areas.BOSS_ZONE + 9) + Vector3.new(0, 5, 0)
+end
 
 -- Which area (0 = marketplace, nil = on a bridge / outside) contains this position?
 function Areas.at(pos: Vector3): number?

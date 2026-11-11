@@ -121,6 +121,15 @@ G.Codes = {
 	["PREESH EATS"] = { cash = 1e13, diamonds = 1e9, rebirths = 30, allAreas = true },
 }
 
+---------------------------------------------------------------- Boss fights
+G.Boss = {
+	time = 120, -- seconds to win
+	extraPlayerHp = 0.6, -- boss health added per extra player
+	inviteTime = 15, -- seconds friends have to accept an invite
+	mowerReach = 14, -- a player's mower hits the boss within this distance (plus the boss's size)
+}
+G.Teleport = { cooldown = 3 } -- seconds between teleports
+
 ---------------------------------------------------------------- Movement & clicking
 G.Speed = { mult = 1.3 } -- multiplies all movement: walking (base 20) and every vehicle
 G.Sprint = { mult = 1.4 } -- walk speed multiplier while Shift is held
@@ -134,7 +143,11 @@ G.Sounds = {
 	snip = "rbxassetid://9118816543", -- "Scissors Accelerate Cutting Brush 1", Pro Sound Effects
 	mow = "rbxassetid://9116245012", -- "Lawn Mower Motor 2", Pro Sound Effects
 	sell = "rbxassetid://135483737426662",
-	click = "rbxasset://sounds/clickfast.wav",
+	click = "rbxassetid://110948579458469", -- "ui_click_2": every button press
+	open = "rbxasset://sounds/switch.wav", -- a menu opens
+	close = "rbxasset://sounds/SWITCH3.wav", -- a menu closes
+	teleport = "rbxasset://sounds/action_get_up.mp3",
+	ko = "rbxasset://sounds/splat.wav", -- a worker is knocked out
 	buy = "rbxasset://sounds/electronicpingshort.wav",
 	error = "rbxasset://sounds/button.wav",
 	chest = "rbxasset://sounds/unsheath.wav",

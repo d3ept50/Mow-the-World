@@ -70,6 +70,12 @@ function W.power(inst): number
 	return math.floor(def.damage * (1 + 0.2 * ((inst.lvl or 1) - 1)) * 1.5 ^ (inst.tier or 0))
 end
 
+-- Health in boss fights. A worker that runs out is knocked out until the fight ends.
+W.HP_PER_POWER = 10
+function W.health(inst): number
+	return W.power(inst) * W.HP_PER_POWER
+end
+
 function W.levelCost(inst): number
 	local def = W.ById[inst.id]
 	return math.floor(def.damage * 30 * 1.28 ^ ((inst.lvl or 1) - 1))
