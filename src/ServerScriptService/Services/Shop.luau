@@ -526,6 +526,10 @@ function handlers.BossCancel(player)
 	return Boss.cancel(player)
 end
 
+function handlers.WorldBossJoin(player)
+	return Boss.worldJoin(player)
+end
+
 function handlers.BossLeave(player)
 	return Boss.leave(player)
 end

@@ -232,29 +232,40 @@ end
 ---------------------------------------------------------------- boss prompt, lobby and invites
 -- The prompt shows when the player steps into a boss's circle (World tells us), and turns
 -- into a waiting room after "Invite friends". Invited players get a separate invite card.
--- On the boss portal in town the same card lets the player pick any boss they have unlocked.
-local prompt = { zone = nil, dismissed = false, lobby = nil, shown = nil, portal = false, pick = nil }
+-- On the portal in town the same card is the way into the world boss fight.
+local prompt = { zone = nil, dismissed = false, lobby = nil, shown = nil, portal = false }
 local invite = nil -- { area, hostId, endsAt }
 
 local function inFight(): boolean
 	return (player:GetAttribute("BossFight") or 0) ~= 0
 end
 
-local function renderPrompt()
+-- What the world boss card says: it depends on whether the boss is waiting, fighting or resting.
+local function worldInfo(): string
+	local state = workspace:GetAttribute("WorldBoss") or "ready"
+	local left = (workspace:GetAttribute("WorldBossUntil") or 0) - workspace:GetServerTimeNow()
+	if state == "fighting" then
+		local n = workspace:GetAttribute("WorldBossPlayers") or 0
+		return "⚔️ " .. n .. (n == 1 and " player" or " players") .. " fighting · boss at " .. (workspace:GetAttribute("WorldBossHp") or 100) .. "% · ⏱ " .. Util.clock(left) .. "\nJoin in! Rewards are shared by damage dealt."
+	elseif state == "cooldown" then
+		return "😴 The boss is resting. It returns in " .. Util.clock(left) .. ".\nRewards are shared by how much damage you deal."
+	end
+	return "The whole server fights one boss. It grows with every player who joins.\nRewards are shared by how much damage you deal."
+end
+
+local renderPrompt
+function renderPrompt()
 	local card = refs.prompt
 	local lobby = prompt.lobby
-	local unlocked = math.clamp(State.data and State.data.areasUnlocked or 1, 1, #Areas.List)
-	local picking = not lobby and not prompt.dismissed and not prompt.zone and prompt.portal
-	if picking then
-		prompt.pick = math.clamp(prompt.pick or unlocked, 1, unlocked)
-	end
-	local area = lobby and lobby.area or (not prompt.dismissed and prompt.zone) or (picking and prompt.pick) or nil
+	local world = not lobby and not prompt.dismissed and not prompt.zone and prompt.portal
+	local worldState = workspace:GetAttribute("WorldBoss") or "ready"
+	local area = lobby and lobby.area or (not prompt.dismissed and prompt.zone) or (world and Areas.WORLD_ID) or nil
 	if inFight() or not area or not Areas.List[area] then
 		card.Visible = false
 		prompt.shown = nil
 		return
 	end
-	local key = (lobby and "lobby" or picking and ("portal" .. unlocked .. "_") or "ask") .. area
+	local key = (lobby and "lobby" or world and ("world" .. worldState) or "ask") .. area
 	if prompt.shown == key then
 		return
 	end
@@ -266,7 +277,7 @@ local function renderPrompt()
 	end
 	local a = Areas.List[area]
 	local B = a.boss
-	UI.text({ Text = "💀 " .. B.name, Position = UDim2.fromOffset(16, 8), Size = UDim2.new(1, -32, 0, 30), TextSize = 25, TextXAlignment = CENTER, Outline = true, Parent = card })
+	UI.text({ Text = (world and "🌍 WORLD BOSS · " or "💀 ") .. B.name, Position = UDim2.fromOffset(16, 8), Size = UDim2.new(1, -32, 0, 30), TextSize = 25, TextXAlignment = CENTER, Outline = true, Parent = card })
 	local function button(i, n, text, color, fn)
 		local w = (468 - 16 * 2 - 10 * (n - 1)) / n
 		UI.button({ Name = text, Text = text, BackgroundColor3 = color, Position = UDim2.fromOffset(16 + (i - 1) * (w + 10), 96), Size = UDim2.fromOffset(w, 48), TextSize = 17, Parent = card }, fn)
@@ -279,22 +290,25 @@ local function renderPrompt()
 		button(2, 2, "✖ Cancel", T.red, function()
 			State.action("BossCancel")
 		end)
+	elseif world then
+		-- one fight for the whole server: the text below is kept up to date by Menus.refresh
+		refs.promptInfo = UI.text({ Text = worldInfo(), Position = UDim2.fromOffset(16, 42), Size = UDim2.new(1, -32, 0, 44), TextSize = 15, TextXAlignment = CENTER, TextColor3 = T.dim, TextWrapped = true, TextTruncate = Enum.TextTruncate.None, Parent = card })
+		if worldState == "cooldown" then
+			button(1, 2, "😴 Resting…", T.grey, function()
+				Menus.notify("The world boss is resting. Come back when the timer runs out!", "info")
+			end)
+		else
+			button(1, 2, worldState == "fighting" and "⚔️ Join the fight" or "⚔️ Start the fight", T.green, function()
+				State.action("WorldBossJoin")
+			end)
+		end
+		button(2, 2, "✖ Exit", T.red, function()
+			prompt.dismissed = true
+			renderPrompt()
+		end)
 	else
 		refs.promptInfo = nil
-		if picking then
-			-- arrows either side of the name step through the unlocked bosses
-			local function arrow(text, x, step)
-				UI.button({ Name = text, Text = text, BackgroundColor3 = T.card2, AnchorPoint = Vector2.new(x, 0), Position = UDim2.new(x, x == 0 and 14 or -14, 0, 8), Size = UDim2.fromOffset(44, 32), TextSize = 18, Parent = card }, function()
-					prompt.pick = (prompt.pick - 1 + step) % unlocked + 1
-					renderPrompt()
-				end)
-			end
-			if unlocked > 1 then
-				arrow("◀", 0, -1)
-				arrow("▶", 1, 1)
-			end
-		end
-		UI.text({ Text = (picking and ("🌀 Boss " .. area .. " of " .. unlocked .. " · " .. a.name .. "   ") or "") .. "❤️ " .. fmt(B.hp) .. "   💵 $" .. fmt(B.cash) .. "   💎 " .. B.diamonds .. "\nYour workers fight for you. Weak workers get knocked out!", Position = UDim2.fromOffset(16, 42), Size = UDim2.new(1, -32, 0, 44), TextSize = 15, TextXAlignment = CENTER, TextColor3 = T.dim, TextWrapped = true, TextTruncate = Enum.TextTruncate.None, Parent = card })
+		UI.text({ Text = "❤️ " .. fmt(B.hp) .. "   💵 $" .. fmt(B.cash) .. "   💎 " .. B.diamonds .. "\nYour workers fight for you. Weak workers get knocked out!", Position = UDim2.fromOffset(16, 42), Size = UDim2.new(1, -32, 0, 44), TextSize = 15, TextXAlignment = CENTER, TextColor3 = T.dim, TextWrapped = true, TextTruncate = Enum.TextTruncate.None, Parent = card })
 		button(1, 3, "⚔️ Solo", T.green, function()
 			State.action("BossSolo", area)
 		end)
@@ -325,9 +339,6 @@ function Menus.setPortal(on: boolean)
 	if on ~= prompt.portal then
 		prompt.portal = on
 		prompt.dismissed = false
-		if on then
-			prompt.pick = nil -- start on the newest boss
-		end
 		renderPrompt()
 	end
 end
@@ -458,7 +469,10 @@ local function refreshHUD()
 	if a then
 		local cut, _, goal, prev = State.milestone(area)
 		refs.areaFill.BackgroundColor3 = a.grass
-		if area > d.areasUnlocked then
+		if area == Areas.WORLD_ID then
+			refs.areaFill.Size = UDim2.fromScale(1, 1)
+			refs.areaLabel.Text = "🌍 World boss · rewards are shared by damage dealt"
+		elseif area > d.areasUnlocked then
 			refs.areaFill.Size = UDim2.fromScale(0, 1)
 			refs.areaLabel.Text = "🔒 " .. a.name
 		elseif goal then
@@ -500,7 +514,8 @@ local function refreshHUD()
 	if model then
 		local hp, max = model:GetAttribute("Health") or 0, model:GetAttribute("MaxHealth") or 1
 		refs.boss.Visible = true
-		refs.bossName.Text = "💀 " .. (model:GetAttribute("BossName") or "Boss")
+		local share = player:GetAttribute("BossShare")
+		refs.bossName.Text = "💀 " .. (model:GetAttribute("BossName") or "Boss") .. (share and ("  ·  You: " .. share .. "%") or "")
 		refs.bossFill.Size = UDim2.fromScale(math.clamp(hp / max, 0, 1), 1)
 		refs.bossLabel.Text = fmt(hp) .. " / " .. fmt(max)
 		refs.bossTime.Text = "⏱ " .. Util.clock((model:GetAttribute("EndsAt") or 0) - workspace:GetServerTimeNow())
@@ -509,6 +524,12 @@ local function refreshHUD()
 	end
 
 	-- boss prompt / waiting room / invite timers
+	if prompt.portal and not prompt.lobby then
+		renderPrompt() -- redraws only when the world boss changes state
+		if refs.promptInfo and prompt.shown and string.sub(prompt.shown, 1, 5) == "world" then
+			refs.promptInfo.Text = worldInfo()
+		end
+	end
 	if prompt.lobby then
 		local l = prompt.lobby
 		local left = math.max(0, math.ceil(l.endsAt - os.clock()))

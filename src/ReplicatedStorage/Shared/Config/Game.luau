@@ -128,6 +128,22 @@ G.Boss = {
 	inviteTime = 15, -- seconds friends have to accept an invite
 	mowerReach = 14, -- a player's mower hits the boss within this distance (plus the boss's size)
 }
+-- The world boss: one fight for the whole server, started from the portal by the castle.
+G.WorldBoss = {
+	time = 240, -- seconds to win
+	firstHp = 200, -- boss health from the first player: this many seconds of their own full damage
+	extraHp = 120, -- and from every player who joins after them (so a crowd has a better chance)
+	hitPct = 0.07, -- one attack takes this share of a worker's full health (x the attack's own strength)
+	fury = { { 0.5, 1.25 }, { 0.25, 1.6 }, { 0.1, 2 } }, -- { health left, how much harder and faster it attacks }
+	joinUntil = 25, -- nobody can join in the last seconds
+	cooldown = 120, -- seconds the boss rests after a fight
+	reward = {
+		cashBase = 2, cashShare = 10, -- win: your best area's boss cash x (base + share of damage x this)
+		diamondsBase = 10, diamondsShare = 40, -- win: diamonds = base + share of damage x this
+		crateShare = 0.1, -- win: a crate for dealing at least this share; the top player gets one more
+		failCash = 4, -- lose: best area's boss cash x this x your share x how much health the boss lost
+	},
+}
 G.Teleport = { cooldown = 3 } -- seconds between teleports
 
 ---------------------------------------------------------------- Movement & clicking

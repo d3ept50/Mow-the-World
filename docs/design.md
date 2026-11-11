@@ -32,7 +32,7 @@ A Roblox mowing simulator built in Place3.rbxl (local, unpublished). Players cut
 - Each area has a 30×30 grass field (6-stud tiles) with a 10×10 hole in the middle: the boss plaza, a paved square with four glowing obelisks where the boss stands. No grass grows on the plaza (`Areas.tileExists`), so each area has 800 tiles.
 - There are no fences. Each area is ringed by its own edge (`EDGES` in WorldBuilder): rock cliffs whose colour, height, caps, lava cracks or crystals change with the theme, or high walls with battlements and towers. An invisible barrier inside the edge keeps players in; the only gaps are the bridges.
 - The marketplace is a paved cartoon town inside a 48-stud town wall with big round towers: the fountain, nine shops in a ring, four diagonal streets that each fork to two bridges, about a hundred pastel houses with bright roofs, trees in stone planters, lamps, benches and bunting. It has no NPCs, no signposts round the fountain and almost no grass.
-- **Boss portal:** a glowing green circle in front of the castle gate (`Areas.PORTAL_POS`). Standing on it opens the boss prompt with ◀ ▶ arrows to pick any unlocked boss, then Solo or Invite friends as usual. Players who enter a fight from the portal are returned to it afterwards.
+- **World boss portal:** a glowing green circle in front of the castle gate (`Areas.PORTAL_POS`). Standing on it opens the world boss card (Start / Join the fight, or a timer while the boss rests).
 - A castle (`Scenery.castle`) stands at the north end of town, at the end of an avenue from the plaza. It is scenery only: an invisible wall all the way round keeps players out.
 - Terrain (islands, beaches, sea) is baked into the place file and only re-bakes when `LAYOUT_VERSION` in WorldBuilder changes. Smooth terrain renders 2 studs above the filled volume, so islands are filled to y = -2.3 and parts are built at y = 0.
 - Everything else is rebuilt by `WorldBuilder.build()` on every server start.
@@ -61,6 +61,11 @@ Grass HP = 5 × 5^(n−1). Grass value = 4^(n−1). Boss HP = grass HP × 120, b
 - **Regrowth:** grass regrows after 16 seconds.
 - **Boss fights:** walking onto the boss plaza in the middle of an area opens a prompt: Solo, Invite friends (everyone on the server who has the area unlocked gets 15 seconds to join) or Exit. Each fight gets its own arena, built far from the islands, and its players are teleported there and back. Fights last 120 seconds and each extra player adds 60% boss HP.
 - **Boss attacks:** the boss walks around the arena and repeats its own attack sequence (`BOSS_MOVES` and `Areas.Moves` in `Config.Areas`). Attacks only hit workers, never players. Boss attack = 6 × grass value per hit.
+- **World boss (Overgrowth King):** one fight for the whole server, in its own arena (a ruined colosseum on a floating rock, `buildWorldArena` in Boss). The first player through the portal starts it; anyone can join until the last 25 seconds. Settings are in `Config.Game` (`G.WorldBoss`).
+  - Health: 200 seconds of the first player's own full damage (workers + mower), plus 120 seconds for each player who joins later. The time limit is 240 seconds, so one player alone is very unlikely to win and a group has a real chance.
+  - Attacks take a share of each worker's own health (7% x the attack's strength), so it is as dangerous to a strong squad as to a weak one. It gets faster and hits harder at 50%, 25% and 10% health.
+  - Rewards are shared by damage dealt. Win: your best area's boss cash x (2 + 10 x your share), 10 + 40 x share diamonds, a crate for dealing 10% or more, and one more crate for the top player. Lose: boss cash x 4 x your share x the fraction of health the boss lost.
+  - The boss rests for 120 seconds after every fight. The fight HUD shows each player's own share of the damage.
 - **Worker health:** 10 × power. A worker at 0 health is knocked out until the fight ends.
 - **Teleport:** the Teleport menu jumps to the marketplace or any unlocked area (3 second cooldown).
 
