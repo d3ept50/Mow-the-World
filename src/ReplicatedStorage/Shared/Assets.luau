@@ -107,6 +107,40 @@ function Assets.fit(model: Model, axis: string, size: number)
 	end
 end
 
+-- Prints which imported models the game can see. Called once when the server starts, so
+-- a missing or misnamed model shows up in the Output window.
+function Assets.report()
+	local folder = RS:FindFirstChild("Assets")
+	if not folder then
+		print("[Assets] ReplicatedStorage.Assets does not exist; using part-built models")
+		return
+	end
+	local found = {}
+	for _, child in ipairs(folder:GetChildren()) do
+		local parts = child:IsA("BasePart") and 1 or 0
+		for _, d in ipairs(child:GetDescendants()) do
+			if d:IsA("BasePart") then
+				parts += 1
+			end
+		end
+		table.insert(found, string.format("%s (%s, %d parts)", child.Name, child.ClassName, parts))
+	end
+	print("[Assets] in ReplicatedStorage.Assets: " .. (#found > 0 and table.concat(found, "; ") or "nothing"))
+	local wanted = { "chest_common", "chest_uncommon", "chest_rare", "chest_epic", "chest_legendary" }
+	for _, name in pairs(Assets.MOWERS) do
+		table.insert(wanted, name)
+	end
+	local missing = {}
+	for _, name in ipairs(wanted) do
+		if not find(name) then
+			table.insert(missing, name)
+		end
+	end
+	if #missing > 0 then
+		print("[Assets] not found, so part-built versions are used: " .. table.concat(missing, ", "))
+	end
+end
+
 function Assets.moveBy(model: Model, delta: Vector3)
 	model:PivotTo(model:GetPivot() + delta)
 end
