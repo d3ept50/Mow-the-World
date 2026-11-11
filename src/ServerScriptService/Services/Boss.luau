@@ -469,9 +469,8 @@ local function release(f, player, back: boolean)
 	player:SetAttribute("BossFight", 0)
 	player:SetAttribute("WorkerHP", nil)
 	if back then
-		local a = Areas.List[f.areaId]
 		local pos = Areas.bossReturnPos(f.areaId)
-		teleport(player, CFrame.lookAt(pos, V(a.center.X, pos.Y, a.center.Z)))
+		teleport(player, CFrame.lookAt(pos, pos + V(0, 0, 1))) -- facing away from the boss, towards the grass
 	end
 end
 
@@ -829,8 +828,7 @@ function Boss.init()
 		end
 		local model = Models.boss(areaId)
 		Models.weld(model)
-		local toCenter = (a.center - pos).Unit
-		model:PivotTo(CFrame.lookAt(pos + V(0, 0.7, 0), pos + V(0, 0.7, 0) + toCenter))
+		model:PivotTo(CFrame.lookAt(pos + V(0, 0.7, 0), pos + V(0, 0.7, 1)))
 		model.Name = "Display" .. areaId
 		bossGui(model, B, false)
 		model.Parent = arenaFolder

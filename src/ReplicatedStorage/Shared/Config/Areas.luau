@@ -4,17 +4,21 @@
 -- (and widen the grid if needed).
 local Areas = {}
 
-Areas.CELL = 280 -- size of one area island (studs)
-Areas.PITCH = 400 -- distance between neighbouring island centres
+Areas.CELL = 400 -- size of one area island (studs)
+Areas.PITCH = 520 -- distance between neighbouring island centres
 Areas.GAP = Areas.PITCH - Areas.CELL -- water between islands (bridge length)
-Areas.MARKET_HALF = Areas.PITCH - Areas.GAP / 2 -- half size of the marketplace island
-Areas.LANDMARK_OFFSET = Vector3.new(102, 0, -102)
+Areas.MARKET_HALF = 330 -- half size of the town island in the middle (its bridges are longer than the rest)
+Areas.LANDMARK_OFFSET = Vector3.new(148, 0, -148)
 Areas.TILE = 6 -- grass tile size
-Areas.GRID = 26 -- tiles per side of a field
-Areas.TILES = Areas.GRID * Areas.GRID
+Areas.GRID = 30 -- tiles per side of a field
+Areas.TILES = Areas.GRID * Areas.GRID -- tile numbers run from 1 to this
+-- The boss stands on a stone plaza in the very middle of the island. The grass field
+-- wraps around it: the middle HOLE x HOLE tiles of the grid have no grass.
+Areas.HOLE = 10
+Areas.TILE_COUNT = Areas.TILES - Areas.HOLE * Areas.HOLE -- grass tiles that really exist
 Areas.RESPAWN = 16 -- seconds for grass to regrow
-Areas.BOSS_OFFSET = Vector3.new(97, 0, 97)
-Areas.SELL_OFFSET = Vector3.new(-99, 0, -99)
+Areas.BOSS_OFFSET = Vector3.new(0, 0, 0) -- the centre of the island
+Areas.SELL_OFFSET = Vector3.new(-138, 0, -138)
 Areas.ARENA_RADIUS = 21
 -- Grass milestones: clear this many grass tiles in an area to earn each reward.
 -- These are the goals for area 1; every later area needs MILESTONE_GROWTH x more per area.
@@ -170,7 +174,7 @@ end
 -- Where a player is put back after a boss fight: just outside the boss's circle.
 function Areas.bossReturnPos(areaId: number): Vector3
 	local a = Areas.List[areaId]
-	return a.bossPos + (a.center - a.bossPos).Unit * (Areas.BOSS_ZONE + 9) + Vector3.new(0, 5, 0)
+	return a.bossPos + Vector3.new(0, 5, Areas.BOSS_ZONE + 5)
 end
 
 -- Which area (0 = marketplace, nil = on a bridge / outside) contains this position?
@@ -199,6 +203,15 @@ function Areas.tilePos(areaId: number, idx: number): Vector3
 	local col = (idx - 1) % Areas.GRID
 	local row = (idx - 1) // Areas.GRID
 	return Vector3.new(a.center.X - HALF + (col + 0.5) * Areas.TILE, 0, a.center.Z - HALF + (row + 0.5) * Areas.TILE)
+end
+
+-- Is there grass on this tile? (The middle of the grid is the boss's plaza.)
+function Areas.tileExists(idx: number): boolean
+	local col = (idx - 1) % Areas.GRID
+	local row = (idx - 1) // Areas.GRID
+	local lo = (Areas.GRID - Areas.HOLE) / 2
+	local hi = lo + Areas.HOLE
+	return not (col >= lo and col < hi and row >= lo and row < hi)
 end
 
 -- Returns col,row (0-based, may be out of range) for a position inside an area

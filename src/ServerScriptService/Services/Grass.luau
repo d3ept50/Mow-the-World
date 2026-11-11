@@ -317,6 +317,10 @@ function Grass.init()
 		local rng = Random.new(areaId)
 		local h, s, v = Style.color(a.grass):ToHSV()
 		for idx = 1, TILES do
+			if not Areas.tileExists(idx) then
+				st.alive[idx] = false -- the boss's plaza: never any grass here
+				continue
+			end
 			local pos = Areas.tilePos(areaId, idx)
 			local height = 1.3 + rng:NextNumber() * 0.9
 			local p = Instance.new("Part")

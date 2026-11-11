@@ -446,6 +446,221 @@ function Scenery.cottage(rng: Random): Model
 	return m
 end
 
+---------------------------------------------------------------- cartoon town houses
+-- Chunky, brightly coloured houses for the marketplace town: fat roofs that overhang,
+-- big round windows, striped awnings and wonky chimneys. The door faces -Z.
+local TOWN_WALLS = {
+	rgb(255, 214, 140), rgb(255, 170, 150), rgb(160, 215, 255), rgb(190, 235, 170), rgb(255, 190, 220),
+	rgb(215, 190, 255), rgb(255, 236, 190), rgb(170, 230, 220),
+}
+local TOWN_ROOFS = { rgb(226, 74, 64), rgb(60, 130, 220), rgb(70, 170, 100), rgb(150, 90, 210), rgb(240, 140, 50), rgb(40, 170, 170) }
+local CREAM, WOODC = rgb(255, 250, 240), rgb(140, 92, 56)
+
+function Scenery.townHouse(rng: Random, lit: boolean?): Model
+	local m = Instance.new("Model")
+	m.Name = "House"
+	local floors = rng:NextInteger(1, 3)
+	local w, d = rng:NextInteger(16, 22), rng:NextInteger(14, 18)
+	local fh = 9 -- height of one floor
+	local wall = TOWN_WALLS[rng:NextInteger(1, #TOWN_WALLS)]
+	local rc = TOWN_ROOFS[rng:NextInteger(1, #TOWN_ROOFS)]
+	local dark = wall:Lerp(rgb(0, 0, 0), 0.25)
+	local front = -d / 2
+	B(m, V(w + 2, 3, d + 2), CF(0, -0.5, 0), rgb(170, 160, 150), "Cobblestone")
+	for f = 1, floors do
+		-- each floor is a little wider than the one below, like a storybook house
+		local grow = (f - 1) * 1.2
+		local y = 1 + (f - 0.5) * fh
+		B(m, V(w + grow, fh, d + grow), CF(0, y, 0), f % 2 == 1 and wall or wall:Lerp(CREAM, 0.45), "Plaster")
+		D(m, V(w + grow + 1, 1, d + grow + 1), CF(0, y + fh / 2, 0), dark, "Wood")
+		local z = front - grow / 2
+		if f == 1 then
+			-- door with a round top, a step and a striped awning
+			D(m, V(4, 6.4, 0.6), CF(0, 4.2, z - 0.1), WOODC, "WoodPlanks")
+			D(m, V(0.6, 4, 4), CF(0, 7.4, z - 0.1) * ANG(0, rad(90), 0), WOODC, "WoodPlanks", "Cylinder")
+			D(m, V(0.5, 0.5, 0.5), CF(1.3, 4.2, z - 0.5), rgb(255, 215, 80), "Metal", "Ball")
+			D(m, V(5.4, 0.6, 2.4), CF(0, 1.3, z - 1.2), rgb(190, 180, 170), "Cobblestone")
+			for i = 0, 4 do
+				D(m, V(1.5, 0.35, 3), CF(-3 + i * 1.5, fh + 0.2, z - 1.4) * ANG(rad(-26), 0, 0), i % 2 == 0 and rc or CREAM, "Fabric")
+			end
+		end
+		for _, sx in ipairs({ -1, 1 }) do
+			if f > 1 or w >= 18 then
+				local x = sx * (w / 2 - 3.6)
+				local wy = y + 0.6
+				-- round window in a thick white frame
+				D(m, V(0.5, 4.4, 4.4), CF(x, wy, z - 0.05) * ANG(0, rad(90), 0), CREAM, nil, "Cylinder")
+				local glass = D(m, V(0.6, 3.3, 3.3), CF(x, wy, z - 0.1) * ANG(0, rad(90), 0), lit and rgb(255, 228, 150) or rgb(150, 205, 240), lit and "Neon" or "Glass", "Cylinder")
+				D(m, V(3.3, 0.35, 0.8), CF(x, wy, z - 0.15), CREAM)
+				D(m, V(0.35, 3.3, 0.8), CF(x, wy, z - 0.15), CREAM)
+				D(m, V(3.8, 1, 1.2), CF(x, wy - 2.9, z - 0.6), WOODC, "WoodPlanks")
+				D(m, V(3.4, 1.3, 1), CF(x, wy - 2, z - 0.6), Color3.fromHSV(rng:NextNumber(), 0.65, 1), "Grass")
+				if lit and sx == 1 and f == floors then
+					light(glass, rgb(255, 220, 150), 20, 0.9)
+				end
+			end
+		end
+	end
+	local top = 1 + floors * fh
+	local grow = (floors - 1) * 1.2
+	roof(m, CF(0, top, 0), w + grow + 5, d + grow + 6, 8.5, rc, "Slate")
+	D(m, V(w + grow + 5.4, 1.2, 1.4), CF(0, top + 8.4, 0), rc:Lerp(rgb(0, 0, 0), 0.25), "Slate") -- ridge
+	-- a chimney that leans a little
+	local cx = (w / 2 - 4) * (rng:NextInteger(0, 1) == 0 and -1 or 1)
+	local lean = ANG(0, 0, rad(rng:NextNumber(-7, 7)))
+	B(m, V(3, 9, 3), CF(cx, top + 5, d / 5) * lean, rgb(190, 110, 90), "Brick")
+	local pot = D(m, V(3.8, 1, 3.8), CF(cx, top + 5, d / 5) * lean * CF(0, 5, 0), rgb(120, 76, 66), "Brick")
+	if lit then
+		local smoke = particles(pot, rgb(235, 235, 240), 3, 3, 2.6, 3.5)
+		smoke.LightEmission = 0
+	end
+	m.WorldPivot = CF(0, 0, 0)
+	return m
+end
+
+-- The town castle: curtain wall, corner towers, gatehouse and a tall keep. Pure scenery
+-- (nothing collides; the town puts an invisible wall round it). The gate faces -Z.
+function Scenery.castle(): Model
+	local m = Instance.new("Model")
+	m.Name = "Castle"
+	local STONE, STONE2 = rgb(226, 212, 186), rgb(206, 190, 164)
+	local TRIM, RED, BLUE, GOLD = rgb(150, 112, 84), rgb(214, 74, 62), rgb(60, 130, 220), rgb(255, 210, 80)
+	local GLOW = rgb(255, 226, 140)
+	local HW, HD, WH = 54, 38, 30 -- half width, half depth, wall height
+
+	local function window(cf, w, h, lit)
+		local g = D(m, V(w, h, 0.8), cf, GLOW, "Neon")
+		D(m, V(0.8, w, w), cf * CF(0, h / 2, 0) * ANG(0, rad(90), 0), GLOW, "Neon", "Cylinder")
+		D(m, V(w + 1.4, 1, 1.4), cf * CF(0, -h / 2 - 0.5, 0), TRIM, "Wood")
+		g.CastShadow = false
+		if lit then
+			light(g, GLOW, 26, 0.9)
+		end
+	end
+	-- round tower with a pointed roof, windows facing the gate side
+	local function tower(x, z, d, h, roofC, flag)
+		cylV(m, h, d, V(x, h / 2 - 2, z), STONE, "Brick", true)
+		cylV(m, 3, d + 3, V(x, h - 3, z), STONE2, "Brick", true)
+		cylV(m, 1.4, d + 4, V(x, h - 1, z), TRIM, "Brick", true).CastShadow = false
+		local n, step = 5, d * 0.24
+		for k = 0, n - 1 do
+			local dd = (d + 4) * (1 - k / n)
+			cylV(m, step, dd, V(x, h + (k + 0.5) * step, z), roofC, "Slate", true).CastShadow = false
+		end
+		local top = h + n * step
+		D(m, V(0.6, 9, 0.6), V(x, top + 4, z), TRIM, "Metal")
+		D(m, V(1.8, 1.8, 1.8), V(x, top + 9, z), GOLD, "Neon", "Ball")
+		if flag then
+			D(m, V(7, 4, 0.3), V(x + 3.8, top + 6, z), flag, "Fabric")
+		end
+		for i, wy in ipairs({ h * 0.5, h * 0.8 }) do
+			window(CF(x, wy, z - d / 2 + 0.1), 2.4, 4.4, i == 2)
+		end
+	end
+	-- straight wall with battlements; runs along X when alongX, else along Z
+	local function wall(x, z, len, alongX, h)
+		local size = alongX and V(len, h + 4, 7) or V(7, h + 4, len)
+		D(m, size, V(x, h / 2 - 2, z), STONE, "Brick")
+		D(m, alongX and V(len, 1.6, 8) or V(8, 1.6, len), V(x, h - 0.6, z), TRIM, "Brick").CastShadow = false
+		D(m, alongX and V(len, 5, 8) or V(8, 5, len), V(x, 1.5, z), STONE2:Lerp(rgb(0, 0, 0), 0.2), "Brick").CastShadow = false
+		local n = math.max(1, math.floor(len / 9))
+		for i = 1, n do
+			local off = -len / 2 + (i - 0.5) * len / n
+			D(m, alongX and V(len / n * 0.5, 4, 8) or V(8, 4, len / n * 0.5), alongX and V(x + off, h + 2, z) or V(x, h + 2, z + off), STONE2, "Brick").CastShadow = false
+		end
+	end
+
+	D(m, V(HW * 2, 1.6, HD * 2), V(0, -0.5, 0), rgb(196, 186, 170), "Cobblestone").CastShadow = false
+	-- curtain wall (the front one has the gatehouse in the middle)
+	wall(0, HD, HW * 2, true, WH)
+	wall(-HW, 0, HD * 2, false, WH)
+	wall(HW, 0, HD * 2, false, WH)
+	wall(-(HW + 16) / 2, -HD, HW - 16, true, WH)
+	wall((HW + 16) / 2, -HD, HW - 16, true, WH)
+	for _, sx in ipairs({ -1, 1 }) do
+		tower(sx * HW, -HD, 20, 52, RED, sx == 1 and GOLD or nil)
+		tower(sx * HW, HD, 20, 58, RED)
+	end
+
+	-- gatehouse
+	local gz = -HD - 3
+	D(m, V(32, 42, 16), V(0, 19, gz), STONE, "Brick")
+	D(m, V(34, 2, 18), V(0, 39.6, gz), TRIM, "Brick").CastShadow = false
+	for i = -2, 2 do
+		D(m, V(4, 4, 18), V(i * 7, 42, gz), STONE2, "Brick").CastShadow = false
+	end
+	local front = gz - 8
+	D(m, V(14, 16, 1), V(0, 7, front - 0.1), rgb(96, 64, 42), "WoodPlanks") -- doors
+	D(m, V(1, 14, 14), CF(0, 15, front - 0.1) * ANG(0, rad(90), 0), rgb(96, 64, 42), "WoodPlanks", "Cylinder")
+	D(m, V(0.5, 21, 1.2), V(0, 10, front - 0.4), rgb(60, 42, 30), "Wood")
+	for i = -2, 2 do
+		if i ~= 0 then
+			D(m, V(0.7, 20 - math.abs(i) * 1.5, 0.5), V(i * 2.8, 9.5 - math.abs(i) * 0.75, front - 0.8), rgb(70, 70, 80), "Metal") -- portcullis bars
+		end
+	end
+	for _, y in ipairs({ 5, 11 }) do
+		D(m, V(14, 0.7, 0.5), V(0, y, front - 0.8), rgb(70, 70, 80), "Metal")
+	end
+	D(m, V(18, 3, 2), V(0, 24.5, front - 0.3), TRIM, "Brick")
+	-- banners either side of the door, and a shield above it
+	for _, sx in ipairs({ -1, 1 }) do
+		D(m, V(5, 16, 0.4), V(sx * 12, 22, front - 0.3), RED, "Fabric")
+		D(m, V(5, 2, 0.5), V(sx * 12, 29.5, front - 0.4), GOLD, "Metal")
+		D(m, V(2.4, 2.4, 0.6), CF(sx * 12, 22, front - 0.5) * ANG(0, 0, rad(45)), GOLD, "Metal")
+		tower(sx * 20, gz - 4, 12, 50, BLUE)
+	end
+	D(m, V(1, 7, 7), CF(0, 32, front - 0.3) * ANG(0, rad(90), 0), GOLD, "Metal", "Cylinder")
+	D(m, V(1.2, 4, 4), CF(0, 32, front - 0.4) * ANG(0, rad(90), 0), RED, "SmoothPlastic", "Cylinder")
+	-- steps and torches
+	D(m, V(22, 1.2, 8), V(0, 0.2, front - 4), rgb(190, 180, 168), "Cobblestone")
+	for _, sx in ipairs({ -1, 1 }) do
+		D(m, V(1, 7, 1), V(sx * 9.5, 3.5, front - 1), rgb(60, 42, 30), "Wood")
+		local flame = D(m, V(1.8, 2.2, 1.8), V(sx * 9.5, 8, front - 1), rgb(255, 150, 50), "Neon", "Ball")
+		light(flame, rgb(255, 170, 80), 30, 1.2)
+		particles(flame, rgb(255, 180, 80), 8, 2, 1.2, 0.6)
+	end
+
+	-- the keep: a big block, a smaller block on top, and the great tower
+	local kz = 8
+	D(m, V(56, 60, 40), V(0, 28, kz), STONE, "Brick")
+	D(m, V(58, 2, 42), V(0, 57.6, kz), TRIM, "Brick").CastShadow = false
+	D(m, V(58, 2, 42), V(0, 30, kz), STONE2, "Brick").CastShadow = false
+	for i = -3, 3 do
+		D(m, V(4.4, 4.4, 42), V(i * 8.6, 60.2, kz), STONE2, "Brick").CastShadow = false
+	end
+	for i = -2, 2 do
+		D(m, V(58, 4.4, 4.4), V(0, 60.2, kz + i * 9), STONE2, "Brick").CastShadow = false
+	end
+	for row, wy in ipairs({ 16, 42 }) do
+		for i = -1, 1 do
+			window(CF(i * 16, wy, kz - 20.1), 4, 7, row == 2 and i == 0)
+		end
+	end
+	D(m, V(38, 24, 26), V(0, 70, kz + 2), STONE, "Brick")
+	roof(m, CF(0, 82, kz + 2), 44, 32, 16, BLUE, "Slate")
+	D(m, V(44.4, 1.6, 1.8), V(0, 98, kz + 2), BLUE:Lerp(rgb(0, 0, 0), 0.25), "Slate")
+	window(CF(-9, 70, kz - 11.1), 3.4, 6, false)
+	window(CF(9, 70, kz - 11.1), 3.4, 6, false)
+	for _, sx in ipairs({ -1, 1 }) do
+		tower(sx * 28, kz - 20, 14, 78, BLUE)
+		tower(sx * 28, kz + 20, 14, 84, BLUE)
+	end
+	tower(0, kz + 14, 24, 128, RED, RED)
+	-- a balcony on the great tower
+	cylV(m, 2, 32, V(0, 104, kz + 14), TRIM, "Brick", true).CastShadow = false
+	cylV(m, 3, 30, V(0, 106, kz + 14), STONE2, "Brick", true).CastShadow = false
+
+	-- courtyard: a few trees and a well so it is not empty when seen from above
+	for _, sx in ipairs({ -1, 1 }) do
+		local tx, tz = sx * 40, -22
+		cylV(m, 9, 2.4, V(tx, 4, tz), rgb(110, 80, 50), "Wood", true)
+		D(m, V(11, 9, 11), V(tx, 11, tz), rgb(70, 170, 70), "Grass", "Ball")
+		D(m, V(8, 7, 8), V(tx + 3, 15, tz + 2), rgb(90, 190, 84), "Grass", "Ball")
+	end
+	m.WorldPivot = CF(0, 0, 0)
+	return m
+end
+
 Scenery.B, Scenery.D, Scenery.Wg, Scenery.cylV, Scenery.light, Scenery.particles = B, D, Wg, cylV, light, particles
 
 return Scenery
