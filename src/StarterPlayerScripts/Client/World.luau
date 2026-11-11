@@ -646,10 +646,11 @@ local function findRoute(areaId)
 			-- the gate is thin along the bridge, and the bridge runs away from the area's centre
 			local gp, c = g.Position, Areas.List[areaId].center
 			local bridgeStart
+			local span = g:GetAttribute("Span") or Areas.GAP
 			if g.Size.X < g.Size.Z then
-				bridgeStart = V(gp.X + math.sign(gp.X - c.X) * Areas.GAP, 0, gp.Z)
+				bridgeStart = V(gp.X + math.sign(gp.X - c.X) * span, 0, gp.Z)
 			else
-				bridgeStart = V(gp.X, 0, gp.Z + math.sign(gp.Z - c.Z) * Areas.GAP)
+				bridgeStart = V(gp.X, 0, gp.Z + math.sign(gp.Z - c.Z) * span)
 			end
 			return { area = areaId, gate = V(gp.X, 0, gp.Z), bridgeStart = bridgeStart }
 		end

@@ -27,11 +27,12 @@ A Roblox mowing simulator built in Place3.rbxl (local, unpublished). Players cut
 
 ## Map
 
-- An archipelago: a central marketplace island (920 studs wide) and twelve 400-stud area islands around it on a 4×4 grid. Islands sit 520 studs apart, so there are 120 studs of sea between them.
+- An archipelago: a central town island (660 studs wide, `Areas.MARKET_HALF`) and twelve 400-stud area islands around it on a 4×4 grid. Area islands sit 520 studs apart with 120 studs of sea between them; the town is smaller than its cell, so its eight bridges are 250 studs long.
 - Wooden bridges join the marketplace to its neighbours and each area to the next. A locked gate (force field) stands at the far end of each bridge until the previous boss is beaten.
 - Each area has a 30×30 grass field (6-stud tiles) with a 10×10 hole in the middle: the boss plaza, a paved square with four glowing obelisks where the boss stands. No grass grows on the plaza (`Areas.tileExists`), so each area has 800 tiles.
 - There are no fences. Each area is ringed by its own edge (`EDGES` in WorldBuilder): rock cliffs whose colour, height, caps, lava cracks or crystals change with the theme, or high walls with battlements and towers. An invisible barrier inside the edge keeps players in; the only gaps are the bridges.
-- The marketplace is a paved cartoon town inside a town wall: the fountain, nine shops in a ring, stone streets to every bridge, about a hundred pastel houses with bright roofs along the streets, trees in stone planters, lamps, benches and bunting. It has no NPCs, no signposts round the fountain and almost no grass.
+- The marketplace is a paved cartoon town inside a 48-stud town wall with big round towers: the fountain, nine shops in a ring, four diagonal streets that each fork to two bridges, about a hundred pastel houses with bright roofs, trees in stone planters, lamps, benches and bunting. It has no NPCs, no signposts round the fountain and almost no grass.
+- A castle (`Scenery.castle`) stands at the north end of town, at the end of an avenue from the plaza. It is scenery only: an invisible wall all the way round keeps players out.
 - Terrain (islands, beaches, sea) is baked into the place file and only re-bakes when `LAYOUT_VERSION` in WorldBuilder changes. Smooth terrain renders 2 studs above the filled volume, so islands are filled to y = -2.3 and parts are built at y = 0.
 - Everything else is rebuilt by `WorldBuilder.build()` on every server start.
 

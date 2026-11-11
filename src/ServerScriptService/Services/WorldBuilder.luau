@@ -25,8 +25,9 @@ local CELL, PITCH, GAP, MH = Areas.CELL, Areas.PITCH, Areas.GAP, Areas.MARKET_HA
 local H = CELL / 2
 local GATE_W = 26
 local FENCE_INSET = 5
+local MARKET_CUT = 30 -- how much of each corner of the town island is cut off
 local EDGE_BACK = 9 -- how far inside the cliff line the invisible wall stands
-local LAYOUT_VERSION = 8 -- bump to force the terrain to be baked again
+local LAYOUT_VERSION = 9 -- bump to force the terrain to be baked again
 local WATER_Y = -4
 -- Smooth terrain renders 2 studs above the filled volume, so the islands are filled up to TOP:
 -- the visible ground then sits at about y = -0.3, just below where the parts are built (y = 0).
@@ -174,13 +175,21 @@ end
 
 -- path segments on the marketplace island: { from, to, width }
 local function marketPaths()
-	local segs = {}
+	local segs, seen = {}, {}
 	for _, o in ipairs(openingsOf[0] or {}) do
 		local d = SIDE_DIR[o.side]
 		local perp = (o.side == "x+" or o.side == "x-") and V(0, 0, 1) or V(1, 0, 0)
 		local target = d * (MH + 2) + perp * o.offset
 		local knee = d * (MH - 70) + perp * o.offset
-		table.insert(segs, { target.Unit * 128, knee, 18, main = true })
+		-- the street leaves the plaza through the nearest gap between two shops (one every 40 degrees)
+		local gap = rad(math.floor(math.deg(math.atan2(knee.X, -knee.Z)) / 40 + 0.5) * 40)
+		local start = V(math.sin(gap), 0, -math.cos(gap)) * 128
+		-- two bridges that share a corner of the town share the street up to it
+		local key = math.floor(knee.X + 0.5) .. "," .. math.floor(knee.Z + 0.5)
+		if not seen[key] then
+			seen[key] = true
+			table.insert(segs, { start, knee, 18, main = true })
+		end
 		table.insert(segs, { knee, target, 18, main = true })
 	end
 	return segs
@@ -284,9 +293,9 @@ function WB.buildTerrain(force: boolean?)
 		terrain:FillBall(V(it[1], -it[3] * 0.72, it[2]), it[3], Enum.Material.Sand)
 		terrain:FillBall(V(it[1] + it[3] * 0.5, -it[3] * 0.9, it[2] - it[3] * 0.4), it[3] * 0.8, Enum.Material.Rock)
 	end
-	islandShape(terrain, V(0, 0, 0), MH + 14, 84, BEACH, -30, Enum.Material.Sand)
+	islandShape(terrain, V(0, 0, 0), MH + 14, 44, BEACH, -30, Enum.Material.Sand)
 	-- the town in the middle is paved from edge to edge
-	islandShape(terrain, V(0, 0, 0), MH, 70, TOP, -30, PAVE)
+	islandShape(terrain, V(0, 0, 0), MH, MARKET_CUT, TOP, -30, PAVE)
 	task.wait()
 	computeOpenings(links())
 	local side = Areas.GRID * Areas.TILE
@@ -364,10 +373,10 @@ end
 -- rocky cliffs with different rock, height and tops, or a built wall with towers.
 -- kind "cliff": color/mat of the rock, minH..maxH, cap = { color, mat } on top (grass, snow...),
 --   lava = glowing cracks down the face, crystal = glowing shards on top.
--- kind "wall": color/mat, height, trim colour, tower roof colour, stripe = second wall colour,
+-- kind "wall": color/mat, height, thick (6), towerD = tower width (12), trim colour, tower roof colour, stripe = second wall colour,
 --   glow = true makes the trim and tower tops neon.
 local EDGES = {
-	[0] = { kind = "wall", color = rgb(226, 212, 186), mat = "Brick", height = 24, trim = rgb(150, 112, 84), tower = rgb(214, 74, 62) },
+	[0] = { kind = "wall", color = rgb(226, 212, 186), mat = "Brick", height = 48, thick = 11, towerD = 22, trim = rgb(150, 112, 84), tower = rgb(214, 74, 62) },
 	{ kind = "cliff", color = rgb(132, 124, 112), mat = "Slate", minH = 24, maxH = 44, cap = { rgb(96, 180, 74), "Grass" } },
 	{ kind = "cliff", color = rgb(204, 168, 116), mat = "Sandstone", minH = 20, maxH = 38, cap = { rgb(170, 196, 84), "Grass" } },
 	{ kind = "cliff", color = rgb(64, 78, 70), mat = "Slate", minH = 34, maxH = 62, cap = { rgb(36, 132, 104), "Grass" } },
@@ -410,33 +419,50 @@ local function edgeRun(parent, p1, p2, st, rng, out)
 
 	if st.kind == "wall" then
 		local hgt = st.height
+		local thick = st.thick or 6
+		local big = hgt > 40
 		local trimMat = st.glow and "Neon" or st.mat
 		local n = math.max(1, math.floor(len / 13 + 0.5))
 		local seg = len / n
 		for i = 1, n do
 			local z = -len / 2 + (i - 0.5) * seg
 			local col = (st.stripe and i % 2 == 0) and st.stripe or st.color
-			deco(parent, V(6, hgt + 4, seg + 0.05), cf * CF(0, hgt / 2 - 2, z), col, st.mat).CastShadow = i % 2 == 0
+			deco(parent, V(thick, hgt + 4, seg + 0.05), cf * CF(0, hgt / 2 - 2, z), col, st.mat).CastShadow = i % 2 == 0
 			-- battlements along the top
-			deco(parent, V(7, 3, seg * 0.5), cf * CF(0, hgt + 1.5, z), st.trim, trimMat).CastShadow = false
+			deco(parent, V(thick + 1, big and 5 or 3, seg * 0.5), cf * CF(0, hgt + (big and 2.5 or 1.5), z), st.trim, trimMat).CastShadow = false
 		end
-		deco(parent, V(7.4, 1.4, len), cf * CF(0, hgt - 0.4, 0), st.trim, trimMat).CastShadow = false
-		deco(parent, V(7.4, 3, len), cf * CF(0, 0.5, 0), st.color:Lerp(rgb(0, 0, 0), 0.25), st.mat).CastShadow = false
+		deco(parent, V(thick + 1.4, big and 2.4 or 1.4, len), cf * CF(0, hgt - 0.4, 0), st.trim, trimMat).CastShadow = false
+		deco(parent, V(thick + 1.4, big and 6 or 3, len), cf * CF(0, big and 2 or 0.5, 0), st.color:Lerp(rgb(0, 0, 0), 0.25), st.mat).CastShadow = false
+		if big then
+			-- a second band half way up breaks up the tall face
+			deco(parent, V(thick + 0.8, 1.6, len), cf * CF(0, hgt * 0.55, 0), st.trim, trimMat).CastShadow = false
+		end
 		-- a round tower with a pointed roof every so often
-		local towers = math.max(1, math.floor(len / 70 + 0.5))
+		local td = st.towerD or 12
+		local k = td / 12
+		local towers = math.max(1, math.floor(len / (big and 90 or 70) + 0.5))
 		for i = 1, towers do
 			local z = -len / 2 + len * (i - 0.5) / towers
 			local at = (cf * CF(o * 1, 0, z)).Position
-			deco(parent, V(hgt + 12, 12, 12), CF(at + V(0, (hgt + 12) / 2 - 2, 0)) * ANG(0, 0, rad(90)), st.color, st.mat, "Cylinder")
-			deco(parent, V(2, 14, 14), CF(at + V(0, hgt + 10, 0)) * ANG(0, 0, rad(90)), st.trim, trimMat, "Cylinder").CastShadow = false
-			for k = 0, 3 do
-				local d = 13 - k * 3.2
-				deco(parent, V(3.2, d, d), CF(at + V(0, hgt + 12.6 + k * 3.2, 0)) * ANG(0, 0, rad(90)), st.tower, st.glow and "Neon" or "Slate", "Cylinder").CastShadow = false
+			local th = hgt + 12 * k
+			deco(parent, V(th, td, td), CF(at + V(0, th / 2 - 2, 0)) * ANG(0, 0, rad(90)), st.color, st.mat, "Cylinder")
+			deco(parent, V(2 * k, td + 2 * k, td + 2 * k), CF(at + V(0, th - 2, 0)) * ANG(0, 0, rad(90)), st.trim, trimMat, "Cylinder").CastShadow = false
+			for j = 0, 3 do
+				local d = (13 - j * 3.2) * k
+				deco(parent, V(3.2 * k, d, d), CF(at + V(0, th + (0.6 + j * 3.2) * k, 0)) * ANG(0, 0, rad(90)), st.tower, st.glow and "Neon" or "Slate", "Cylinder").CastShadow = false
 			end
-			local tip = deco(parent, V(2.4, 2.4, 2.4), at + V(0, hgt + 26.5, 0), st.trim, "Neon", "Ball")
+			local tip = deco(parent, V(2.4 * k, 2.4 * k, 2.4 * k), at + V(0, th + 14.5 * k, 0), st.trim, "Neon", "Ball")
 			tip.CastShadow = false
 			if i == 1 then
 				Models.glow(tip, st.trim, 30)
+			end
+			if big then
+				-- lit windows looking into town
+				local inward = -out
+				for _, wy in ipairs({ hgt * 0.45, hgt * 0.85 }) do
+					local wcf = CFrame.lookAt(at + V(0, wy, 0) + inward * (td / 2 - 0.2), at + V(0, wy, 0) + inward * td)
+					deco(parent, V(2.6, 5, 0.8), wcf, rgb(255, 226, 140), "Neon").CastShadow = false
+				end
 			end
 		end
 		return
@@ -536,7 +562,7 @@ local function edgeLoop(parent, center, half, cut, openings, st, seed)
 end
 
 ---------------------------------------------------------------- bridges & gates
-local function gate(parent, axis, along, lateral, areaId)
+local function gate(parent, axis, along, lateral, areaId, span)
 	local a = Areas.List[areaId]
 	local function at(l, y)
 		return axis == "x" and V(along, y, lateral + l) or V(lateral + l, y, along)
@@ -562,6 +588,7 @@ local function gate(parent, axis, along, lateral, areaId)
 	barrier.Name = "Gate"
 	barrier.CastShadow = false
 	barrier:SetAttribute("Area", areaId)
+	barrier:SetAttribute("Span", span) -- length of the bridge behind it, for the guide arrow
 	CollectionService:AddTag(barrier, "Gate")
 	local prev = Areas.List[areaId - 1]
 	local bb = billboard(barrier, "🔒 " .. a.name .. (prev and ("\nDefeat the " .. prev.boss.name) or ""), 22, 7, 0, WHITE)
@@ -570,9 +597,18 @@ local function gate(parent, axis, along, lateral, areaId)
 end
 
 local function bridge(parent, axis, fixed, lateral, idLow, idHigh)
-	local len = GAP + 10
+	-- the bridge spans the water between the two islands; the town island is smaller than
+	-- its cell, so bridges that start there are longer
+	local from, to = fixed - GAP / 2, fixed + GAP / 2
+	if idLow == 0 then
+		from = MH
+	elseif idHigh == 0 then
+		to = -MH
+	end
+	local len = to - from + 10
+	local centre = (from + to) / 2
 	local function cfAt(alongOff, y, lat)
-		local pos = axis == "x" and V(fixed + alongOff, y, lateral + (lat or 0)) or V(lateral + (lat or 0), y, fixed + alongOff)
+		local pos = axis == "x" and V(centre + alongOff, y, lateral + (lat or 0)) or V(lateral + (lat or 0), y, centre + alongOff)
 		return axis == "x" and CF(pos) * ANG(0, rad(90), 0) or CF(pos)
 	end
 	local wood, dark = rgb(156, 112, 70), rgb(96, 68, 44)
@@ -606,7 +642,7 @@ local function bridge(parent, axis, fixed, lateral, idLow, idHigh)
 		end
 	end
 	local plusHigh = idHigh == id
-	gate(parent, axis, fixed + (plusHigh and 1 or -1) * (GAP / 2 - 1), lateral, id)
+	gate(parent, axis, fixed + (plusHigh and 1 or -1) * (GAP / 2 - 1), lateral, id, to - from)
 end
 
 local function pathStrip(parent, p1, p2, width, color, mat)
@@ -1067,21 +1103,46 @@ local function buildMarket(world)
 
 	local edge = Instance.new("Folder")
 	edge.Name = "Edge"
-	edgeLoop(edge, V(0, 0, 0), MH, 70, openings, EDGES[0], 7)
+	edgeLoop(edge, V(0, 0, 0), MH, MARKET_CUT, openings, EDGES[0], 7)
 	edge.Parent = m
+
+	-- The castle stands at the north end of town, behind the shops. It is scenery: an
+	-- invisible wall all the way round keeps players out.
+	local CASTLE_Z, CASTLE_W, CASTLE_D = -248, 70, 60 -- centre, half width, half depth of the fenced-off block
+	local castle = Scenery.castle()
+	castle:PivotTo(CFrame.lookAt(V(0, 0, CASTLE_Z), V(0, 0, 0)) + SINK)
+	castle.Parent = m
+	for _, w in ipairs({
+		{ V(CASTLE_W * 2 + 2, 150, 1), V(0, 70, CASTLE_Z + CASTLE_D) },
+		{ V(CASTLE_W * 2 + 2, 150, 1), V(0, 70, CASTLE_Z - CASTLE_D) },
+		{ V(1, 150, CASTLE_D * 2), V(-CASTLE_W, 70, CASTLE_Z) },
+		{ V(1, 150, CASTLE_D * 2), V(CASTLE_W, 70, CASTLE_Z) },
+	}) do
+		local b = part(m, w[1], w[2], WHITE)
+		b.Transparency = 1
+		b.CastShadow = false
+		b.Name = "Barrier"
+	end
+	pathStrip(m, V(0, 0, -128), V(0, 0, CASTLE_Z + CASTLE_D), 16, rgb(205, 190, 170), "Cobblestone")
 
 	-- The town: cartoon houses along every street and in rings around the plaza.
 	local town = Instance.new("Folder")
 	town.Name = "Town"
 	local houses = {}
-	local inner = MH - EDGE_BACK - 20
+	local inner = MH - EDGE_BACK - 24
 	local function fits(pos, radius)
 		local x, z = pos.X, pos.Z
 		if math.sqrt(x * x + z * z) < 136 + radius then
 			return false
 		end
-		if math.max(math.abs(x), math.abs(z)) > inner - radius or math.abs(x) + math.abs(z) > 2 * inner - 76 - radius then
+		if math.max(math.abs(x), math.abs(z)) > inner - radius or math.abs(x) + math.abs(z) > 2 * inner - MARKET_CUT - 6 - radius then
 			return false
+		end
+		if math.abs(x) < CASTLE_W + radius + 3 and math.abs(z - CASTLE_Z) < CASTLE_D + radius + 3 then
+			return false
+		end
+		if math.abs(x) < 12 + radius and z < 0 then
+			return false -- the avenue up to the castle
 		end
 		for _, seg in ipairs(paths) do
 			if segDist(x, z, seg[1], seg[2]) < seg[3] / 2 + 2 + radius then
@@ -1142,7 +1203,7 @@ local function buildMarket(world)
 		end
 	end
 	-- big trees between the shops, at the edge of the plaza
-	for i = 0, 8 do
+	for i = 1, 8 do -- none at the north end: that is the avenue up to the castle
 		local ang = rad(i * 40)
 		local pos = V(math.sin(ang), 0, -math.cos(ang)) * 121
 		deco(m, V(2.4, 12, 12), CF(pos + V(0, 0.6, 0)) * ANG(0, 0, rad(90)), rgb(250, 240, 222), "Marble", "Cylinder")
