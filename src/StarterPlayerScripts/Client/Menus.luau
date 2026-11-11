@@ -232,7 +232,8 @@ end
 ---------------------------------------------------------------- boss prompt, lobby and invites
 -- The prompt shows when the player steps into a boss's circle (World tells us), and turns
 -- into a waiting room after "Invite friends". Invited players get a separate invite card.
-local prompt = { zone = nil, dismissed = false, lobby = nil, shown = nil }
+-- On the boss portal in town the same card lets the player pick any boss they have unlocked.
+local prompt = { zone = nil, dismissed = false, lobby = nil, shown = nil, portal = false, pick = nil }
 local invite = nil -- { area, hostId, endsAt }
 
 local function inFight(): boolean
@@ -242,13 +243,18 @@ end
 local function renderPrompt()
 	local card = refs.prompt
 	local lobby = prompt.lobby
-	local area = lobby and lobby.area or (not prompt.dismissed and prompt.zone) or nil
+	local unlocked = math.clamp(State.data and State.data.areasUnlocked or 1, 1, #Areas.List)
+	local picking = not lobby and not prompt.dismissed and not prompt.zone and prompt.portal
+	if picking then
+		prompt.pick = math.clamp(prompt.pick or unlocked, 1, unlocked)
+	end
+	local area = lobby and lobby.area or (not prompt.dismissed and prompt.zone) or (picking and prompt.pick) or nil
 	if inFight() or not area or not Areas.List[area] then
 		card.Visible = false
 		prompt.shown = nil
 		return
 	end
-	local key = (lobby and "lobby" or "ask") .. area
+	local key = (lobby and "lobby" or picking and ("portal" .. unlocked .. "_") or "ask") .. area
 	if prompt.shown == key then
 		return
 	end
@@ -275,7 +281,20 @@ local function renderPrompt()
 		end)
 	else
 		refs.promptInfo = nil
-		UI.text({ Text = "❤️ " .. fmt(B.hp) .. "   💵 $" .. fmt(B.cash) .. "   💎 " .. B.diamonds .. "\nYour workers fight for you. Weak workers get knocked out!", Position = UDim2.fromOffset(16, 42), Size = UDim2.new(1, -32, 0, 44), TextSize = 15, TextXAlignment = CENTER, TextColor3 = T.dim, TextWrapped = true, TextTruncate = Enum.TextTruncate.None, Parent = card })
+		if picking then
+			-- arrows either side of the name step through the unlocked bosses
+			local function arrow(text, x, step)
+				UI.button({ Name = text, Text = text, BackgroundColor3 = T.card2, AnchorPoint = Vector2.new(x, 0), Position = UDim2.new(x, x == 0 and 14 or -14, 0, 8), Size = UDim2.fromOffset(44, 32), TextSize = 18, Parent = card }, function()
+					prompt.pick = (prompt.pick - 1 + step) % unlocked + 1
+					renderPrompt()
+				end)
+			end
+			if unlocked > 1 then
+				arrow("◀", 0, -1)
+				arrow("▶", 1, 1)
+			end
+		end
+		UI.text({ Text = (picking and ("🌀 Boss " .. area .. " of " .. unlocked .. " · " .. a.name .. "   ") or "") .. "❤️ " .. fmt(B.hp) .. "   💵 $" .. fmt(B.cash) .. "   💎 " .. B.diamonds .. "\nYour workers fight for you. Weak workers get knocked out!", Position = UDim2.fromOffset(16, 42), Size = UDim2.new(1, -32, 0, 44), TextSize = 15, TextXAlignment = CENTER, TextColor3 = T.dim, TextWrapped = true, TextTruncate = Enum.TextTruncate.None, Parent = card })
 		button(1, 3, "⚔️ Solo", T.green, function()
 			State.action("BossSolo", area)
 		end)
@@ -297,6 +316,18 @@ function Menus.setBossZone(areaId: number?)
 	if areaId ~= prompt.zone then
 		prompt.zone = areaId
 		prompt.dismissed = false
+		renderPrompt()
+	end
+end
+
+-- Called by World: is the player standing on the boss portal in town?
+function Menus.setPortal(on: boolean)
+	if on ~= prompt.portal then
+		prompt.portal = on
+		prompt.dismissed = false
+		if on then
+			prompt.pick = nil -- start on the newest boss
+		end
 		renderPrompt()
 	end
 end

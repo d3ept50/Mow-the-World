@@ -1124,6 +1124,36 @@ local function buildMarket(world)
 		b.Name = "Barrier"
 	end
 	pathStrip(m, V(0, 0, -128), V(0, 0, CASTLE_Z + CASTLE_D), 16, rgb(205, 190, 170), "Cobblestone")
+	-- the boss portal: a glowing green circle on the ground in front of the castle gate
+	do
+		local pp, pr = Areas.PORTAL_POS, Areas.PORTAL_RADIUS
+		local green = rgb(90, 255, 120)
+		local portal = Instance.new("Folder")
+		portal.Name = "BossPortal"
+		deco(portal, V(0.5, pr * 2 + 3, pr * 2 + 3), CF(pp + V(0, 0.42, 0)) * ANG(0, 0, rad(90)), rgb(40, 60, 46), "Slate", "Cylinder").CastShadow = false
+		local ring = deco(portal, V(0.5, pr * 2, pr * 2), CF(pp + V(0, 0.5, 0)) * ANG(0, 0, rad(90)), green, "Neon", "Cylinder")
+		ring.CastShadow = false
+		deco(portal, V(0.52, pr * 2 - 3, pr * 2 - 3), CF(pp + V(0, 0.52, 0)) * ANG(0, 0, rad(90)), rgb(30, 110, 60), "Slate", "Cylinder").CastShadow = false
+		local core = deco(portal, V(0.54, pr * 0.9, pr * 0.9), CF(pp + V(0, 0.54, 0)) * ANG(0, 0, rad(90)), green, "Neon", "Cylinder")
+		core.CastShadow = false
+		core.Transparency = 0.35
+		Models.glow(ring, green, 34)
+		local glowPart = deco(portal, V(1, 1, 1), pp + V(0, 1, 0), green)
+		glowPart.Transparency = 1
+		local e = emitter(glowPart, green, 14, 4)
+		e.SpreadAngle = Vector2.new(60, 60)
+		e.Lifetime = NumberRange.new(1.5, 2.5)
+		for i = 0, 5 do
+			local ang = rad(i * 60)
+			local at = pp + V(math.sin(ang) * (pr - 1.5), 0, math.cos(ang) * (pr - 1.5))
+			local rune = deco(portal, V(1.6, 0.3, 1.6), CF(at + V(0, 0.7, 0)) * ANG(0, ang + rad(45), 0), rgb(200, 255, 210), "Neon")
+			rune.CastShadow = false
+		end
+		local sign = deco(portal, V(1, 1, 1), pp + V(0, 13, 0), WHITE)
+		sign.Transparency = 1
+		billboard(sign, "⚔️ BOSS PORTAL\nFight any boss you have unlocked", 30, 7, 0, green)
+		portal.Parent = m
+	end
 
 	-- The town: cartoon houses along every street and in rings around the plaza.
 	local town = Instance.new("Folder")

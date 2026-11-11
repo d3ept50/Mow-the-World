@@ -14,6 +14,7 @@ local Config = RS.Shared.Config
 local W = require(Config.Workers)
 local Game = require(Config.Game)
 local Areas = require(Config.Areas)
+local Items = require(Config.Items)
 local Util = require(RS.Shared.Util)
 local Models = require(RS.Shared.Models)
 local Style = require(RS.Shared.Style)
@@ -211,6 +212,59 @@ local function tilesOf(areaId)
 		tileCache[areaId] = cache
 	end
 	return cache
+end
+
+-- Grass under the player's own mower is hidden on this screen straight away, without waiting
+-- for the server to answer. Only when one hit is enough to cut it, and only for a moment:
+-- the server still decides, and a tile it did not cut comes back into view.
+local predicted = {} -- [tile part] = time to stop hiding it locally
+local function predictCuts()
+	local now = os.clock()
+	for part, untilT in pairs(predicted) do
+		if now >= untilT then
+			part.LocalTransparencyModifier = 0
+			predicted[part] = nil
+		end
+	end
+	local d = State.data
+	local area = player:GetAttribute("Area") or 0
+	local a = Areas.List[area]
+	local pos = myPos()
+	if not d or not a or not pos or area > d.areasUnlocked or (player:GetAttribute("BossFight") or 0) ~= 0 then
+		return
+	end
+	local def = Items.MowerById[d.equippedMower]
+	if not def or d.bagCount >= State.bagCapacity() or def.damage * Game.Rebirth.powerMult(d.rebirths or 0) < a.grassHP then
+		return
+	end
+	local tiles = tilesOf(area)
+	if not tiles then
+		return
+	end
+	local TILE, GRID = Areas.TILE, Areas.GRID
+	local col, row = Areas.tileCoord(area, pos)
+	local reach = math.ceil(def.radius / TILE)
+	local r2 = (def.radius + TILE * 0.35) ^ 2
+	local ox, oz = a.center.X - GRID * TILE / 2, a.center.Z - GRID * TILE / 2
+	for dr = -reach, reach do
+		local rr = row + dr
+		if rr >= 0 and rr < GRID then
+			for dc = -reach, reach do
+				local cc = col + dc
+				if cc >= 0 and cc < GRID then
+					local part = tiles[rr * GRID + cc + 1]
+					if part and part.Transparency < 1 and not predicted[part] then
+						local dx = ox + (cc + 0.5) * TILE - pos.X
+						local dz = oz + (rr + 0.5) * TILE - pos.Z
+						if dx * dx + dz * dz <= r2 then
+							part.LocalTransparencyModifier = 1
+							predicted[part] = now + 0.6
+						end
+					end
+				end
+			end
+		end
+	end
 end
 
 local function pickTile(areaId, pos, taken)
@@ -848,6 +902,7 @@ function World.init()
 		local camPos = workspace.CurrentCamera.CFrame.Position
 		animateWorld(t, dt, camPos)
 		animateWorkers(t, dt)
+		predictCuts()
 		updateGuide(t)
 	end)
 
@@ -869,6 +924,13 @@ function World.init()
 				end
 			end
 			Menus.setBossZone(zone)
+			-- the boss portal in town
+			local onPortal = false
+			if pos and area == 0 and (player:GetAttribute("BossFight") or 0) == 0 then
+				local dx, dz = pos.X - Areas.PORTAL_POS.X, pos.Z - Areas.PORTAL_POS.Z
+				onPortal = dx * dx + dz * dz <= Areas.PORTAL_RADIUS ^ 2
+			end
+			Menus.setPortal(onPortal)
 		end
 	end)
 

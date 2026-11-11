@@ -7,7 +7,7 @@ end
 
 -- damage per hit, speed = hits/sec, radius in studs, eff = grass units per tile
 Items.Mowers = {
-	{ id = "Scissors", name = "Scissors", damage = 3, speed = 2.0, radius = 5, eff = 1, price = 0, area = 1, look = { kind = "scissors", color = rgb(200, 200, 210), accent = rgb(230, 60, 60), scale = 1 } },
+	{ id = "Scissors", name = "Scissors", damage = 5, speed = 2.0, radius = 5, eff = 1, price = 0, area = 1, look = { kind = "scissors", color = rgb(200, 200, 210), accent = rgb(230, 60, 60), scale = 1 } },
 	{ id = "Shears", name = "Garden Shears", damage = 9, speed = 2.2, radius = 6, eff = 1, price = 75, area = 1, look = { kind = "scissors", color = rgb(170, 180, 190), accent = rgb(60, 160, 70), scale = 1.6 } },
 	{ id = "Push", name = "Basic Push Mower", damage = 40, speed = 2.4, radius = 7, eff = 1.25, price = 500, area = 2, look = { kind = "push", color = rgb(210, 60, 50), accent = rgb(40, 40, 40), scale = 0.9 } },
 	{ id = "Electric", name = "Electric Mower", damage = 180, speed = 2.7, radius = 7.5, eff = 1.5, price = 3500, area = 3, look = { kind = "push", color = rgb(60, 170, 230), accent = rgb(250, 250, 250), scale = 1, engine = true } },
