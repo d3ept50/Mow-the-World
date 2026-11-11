@@ -11,3 +11,5 @@ Thumbs.db
 # Place files (the scripts live in src/)
 *.rbxl
 *.rbxlx
+# Windows "copy of" duplicates
+* - Copy.*
