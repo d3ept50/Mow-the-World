@@ -5,6 +5,7 @@ local Workers = require(Config.Workers)
 local Items = require(Config.Items)
 local Areas = require(Config.Areas)
 local Style = require(script.Parent.Style)
+local Assets = require(script.Parent.Assets)
 
 local Models = {}
 
@@ -211,6 +212,22 @@ function Models.mower(id: string): Model
 		P(m, V(0.45, 0.14, 0.45), CF(-0.25, 1.04, 0.1), L.accent)
 		P(m, V(0.45, 0.14, 0.45), CF(0.25, 1.04, 0.1), L.accent)
 	else
+		-- use the imported Blender model for this mower if it is in ReplicatedStorage.Assets
+		local asset = Assets.clone(Assets.MOWERS[id])
+		if asset then
+			-- handle height 2.75, wheels on the ground, handle just in front of the player
+			Assets.fit(asset, "Y", 2.75)
+			local lo, hi = Assets.bounds(asset)
+			Assets.moveBy(asset, V(-(lo.X + hi.X) / 2, -lo.Y, 1.2 - hi.Z))
+			for _, d in ipairs(asset:GetDescendants()) do
+				if d:IsA("BasePart") then
+					d.Parent = m
+				end
+			end
+			asset:Destroy()
+			m:ScaleTo(L.scale or 1)
+			return m
+		end
 		local w = L.wide and 3.1 or 2.2
 		local deck = P(m, V(w, 0.6, 2.8), CF(0, 0.6, -1.8), L.color, L.mat)
 		deck.Name = "Deck"

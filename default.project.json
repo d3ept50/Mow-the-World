@@ -6,7 +6,11 @@
       "$path": "src/ServerScriptService"
     },
     "ReplicatedStorage": {
-      "$path": "src/ReplicatedStorage"
+      "$path": "src/ReplicatedStorage",
+      "Assets": {
+        "$className": "Folder",
+        "$ignoreUnknownInstances": true
+      }
     },
     "Lighting": {
       "$properties": {

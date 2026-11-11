@@ -52,4 +52,26 @@ To rebuild a model after editing its script:
 blender --background --factory-startup --python models/mower/build_mower.py
 ```
 
+### Putting a model into the game
+
+Rojo cannot sync meshes, so each model is imported once by hand:
+
+1. In Studio, open **File > Import 3D** and pick the `.fbx`.
+2. Import it as a single Model. Do not rename the parts inside it.
+3. Drag the Model into **ReplicatedStorage > Assets**.
+4. Make sure it has the right name (capital letters don't matter):
+
+| File | Name in Assets | Used for |
+|---|---|---|
+| `models/mower/mower.fbx` | `mower` | Basic Push Mower |
+| `models/chests/chest_common.fbx` | `chest_common` | Common chest |
+| `models/chests/chest_uncommon.fbx` | `chest_uncommon` | Uncommon chest |
+| `models/chests/chest_rare.fbx` | `chest_rare` | Rare chest |
+| `models/chests/chest_epic.fbx` | `chest_epic` | Epic chest |
+| `models/chests/chest_legendary.fbx` | `chest_legendary` | Legendary chest |
+
+5. Save the place. The game uses a model as soon as it is in the folder, and falls back to its part-built version when it is missing. The game sizes and places the model itself.
+
+If a model faces the wrong way in game, set its angle in `Assets.YAW` in `src/ReplicatedStorage/Shared/Assets.luau`.
+
 To use one in Studio, open the 3D Importer and pick the `.fbx`. Colours are stored as vertex colours, so leave each MeshPart's colour white. Models are sized so 1 Blender unit is 1 stud.
