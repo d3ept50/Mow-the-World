@@ -61,6 +61,26 @@ for _, w in ipairs(W.List) do
 	table.insert(W.ByRarity[w.rarity], w)
 end
 
+-- Chest workers: one per rarity, found only in the treasure chests hidden in the grass.
+-- They are stronger than crate workers of the same rarity and are never in a crate
+-- (they are kept out of W.ByRarity, which is what crates roll from).
+W.ChestList = {
+	{ id = "TreasureMole", name = "Treasure Mole", rarity = "Common", damage = 6, look = { rgb(120, 85, 60), rgb(205, 165, 135), "helmet", rgb(250, 210, 40), "rake" } },
+	{ id = "LuckyLeprechaun", name = "Lucky Leprechaun", rarity = "Uncommon", damage = 22, look = { rgb(40, 160, 70), rgb(245, 205, 160), "tophat", rgb(30, 120, 55), "shears" } },
+	{ id = "ChestMimic", name = "Chest Mimic", rarity = "Rare", damage = 110, look = { rgb(150, 100, 55), rgb(255, 210, 90), "horns", rgb(240, 235, 220), "shears" } },
+	{ id = "PiratePruner", name = "Pirate Pruner", rarity = "Epic", damage = 1100, look = { rgb(160, 30, 40), rgb(235, 190, 150), "tophat", rgb(25, 25, 30), "scythe" } },
+	{ id = "GildedGolem", name = "Gilded Golem", rarity = "Legendary", damage = 14000, look = { rgb(255, 205, 60), rgb(255, 235, 150), "crown", rgb(255, 245, 200), "trimmer" } },
+	{ id = "KrakenKeeper", name = "Kraken Keeper", rarity = "Mythic", damage = 220000, look = { rgb(30, 160, 170), rgb(120, 230, 220), "hood", rgb(20, 90, 110), "scythe" } },
+	{ id = "TheLocksmith", name = "The Locksmith", rarity = "Secret", damage = 4.2e6, look = { rgb(18, 18, 24), rgb(70, 70, 85), "tophat", rgb(255, 200, 60), "shears" } },
+	{ id = "FortunesFavourite", name = "Fortune's Favourite", rarity = "Divine", damage = 8.5e7, look = { rgb(255, 250, 235), rgb(255, 255, 245), "halo", rgb(255, 220, 90), "scythe" } },
+}
+W.ChestByRarity = {}
+for _, w in ipairs(W.ChestList) do
+	w.chest = true
+	W.ById[w.id] = w
+	W.ChestByRarity[w.rarity] = w
+end
+
 -- Total damage of an owned worker instance { id, lvl, tier }
 function W.power(inst): number
 	local def = W.ById[inst.id]

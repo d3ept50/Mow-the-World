@@ -85,7 +85,14 @@ Grass HP = 5 × 5^(n−1). Grass value = 4^(n−1). Boss HP = grass HP × 120, b
 
 ## Chests, diamonds, rebirth
 
-- **Chests:** 4 per area, respawning after 40 seconds. Rarities Common to Legendary. They give cash, plus diamonds, boosts, crates or workers at higher rarities.
+- **Chests:** 4 hidden per area, respawning after 40 seconds. Rarities Common to Legendary; a rarer chest gives more cash and diamonds, more luck and a better chance of a double spin.
+- **Chest spin:** opening a chest plays a reel (`Client.ChestSpin`): the screen blurs, an aura in the chest's colour turns behind it, and each column spins through what the chest can hold and stops on one prize. The server decides everything in `Chests.open` and gives the prizes straight away; the client only plays the show. Settings are in `Config.Game` (`G.ChestSpin`).
+  - Prizes: cash, a cash jackpot (5x), diamonds, a 5-minute boost, a worker crate, a chest worker, or a luck prize.
+  - **Luck prizes** (2x or 3x) are not rewards: they start another spin in a new column with that much more luck, up to two in a row. Luck makes workers more likely and pushes them towards the rarer end.
+  - **Double spin:** 8% (Common chest) to 40% (Legendary chest) chance of two columns side by side.
+  - **Chest workers** (`W.ChestList`) are one per rarity, stronger than crate workers of the same rarity, and never come from crates. Which rarity a worker prize is depends on the islands: areas 1-4 are mostly Common to Rare, 5-8 Uncommon to Mythic, 9-12 Rare to Divine.
+  - Epic workers get their colour, a banner and confetti; Legendary and better add a flash, a second burst and a shake.
+  - **First chest:** a player's first ever chest always lands on an Epic (85%), Legendary (13%) or Mythic (2%) chest worker.
 - **Diamonds:** come from bosses, rare chests, achievements, daily rewards and Robux. Never from area completion.
 - **Diamond shop:** permanent Auto Sell, +1 worker slot (×2), 15-minute boosts (cash, speed, luck), Mythic and Secret crates.
 - **Rebirth** (Rebirth Shrine):

@@ -16,6 +16,29 @@ G.Chests = {
 	{ id = "Legendary", weight = 1, cash = 12000, color = rgb(255, 190, 40), diamonds = { 10, 25 }, boostChance = 0.5, crateChance = 1, workerChance = 0.3, title = "Treasure Hunter" },
 }
 
+-- Opening a chest spins a reel. Every spin lands on one prize.
+G.ChestSpin = {
+	-- chance that a chest gives two spins side by side, by chest rarity (Common .. Legendary)
+	double = { 0.08, 0.12, 0.18, 0.26, 0.4 },
+	-- luck that comes with the chest itself, by chest rarity
+	tierLuck = { 1, 1.15, 1.35, 1.6, 2 },
+	-- how often each kind of prize comes up (relative weights). A luck prize is not a reward:
+	-- it starts another spin in a new column with that much more luck.
+	kinds = { cash = 34, bigCash = 14, diamonds = 14, boost = 8, crate = 8, worker = 14, luck2 = 6, luck3 = 2 },
+	maxChain = 2, -- luck prizes that can follow one another in one spin
+	bigCash = 5, -- a jackpot is this many times the chest's normal cash
+	diamonds = { { 1, 2 }, { 1, 4 }, { 2, 6 }, { 5, 12 }, { 12, 30 } }, -- by chest rarity
+	-- Which chest worker a worker prize is, in percent, by how far through the islands the
+	-- chest was found. Luck pushes these towards the rarer end.
+	stages = {
+		{ upTo = 4, odds = { Common = 48, Uncommon = 30, Rare = 15, Epic = 6, Legendary = 1 } }, -- early game
+		{ upTo = 8, odds = { Uncommon = 28, Rare = 34, Epic = 22, Legendary = 11, Mythic = 5 } }, -- mid game
+		{ upTo = 12, odds = { Rare = 18, Epic = 28, Legendary = 27, Mythic = 18, Secret = 7, Divine = 2 } }, -- end game
+	},
+	-- a player's very first chest always lands on a chest worker of one of these rarities
+	first = { Epic = 85, Legendary = 13, Mythic = 2 },
+}
+
 ---------------------------------------------------------------- Rebirth
 G.Rebirth = {}
 function G.Rebirth.cost(n: number): number -- diamonds for rebirth n -> n+1
