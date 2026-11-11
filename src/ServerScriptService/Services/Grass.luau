@@ -17,8 +17,12 @@ local SELL_RANGE = 9
 
 local state = {} -- [areaId] = { hp, alive, parts, queue, head }
 local cutCallbacks = {}
-local nextHit = {}
-local lastHit = {}
+-- Each player has a timer per tile: grass is hit the moment it comes within reach of the
+-- mower, then again every 1 / speed seconds while it stays there.
+local tileHit = {} -- [player] = { area = id, t = { [idx] = time of last hit }, pruned = time }
+local statCache = {} -- [player] = { stats, time }: mow stats, re-read 5 times a second
+local STEP = 1 / 30 -- seconds between mowing steps
+local SYNC = 0.1 -- seconds between bag / progress updates sent to clients
 local clickUntil = {} -- [player] = time the click boost runs out
 local mowingUntil = {} -- [player] = time the "Mowing" attribute switches off
 local nextWorker = {}
@@ -137,8 +141,24 @@ local function handleFull(player, pr, now)
 	return true
 end
 
-local function mowerHit(player, pr, areaId, pos, s)
+local function mowerHit(player, pr, areaId, pos, s, now, interval)
 	local st = state[areaId]
+	local th = tileHit[player]
+	if not th or th.area ~= areaId then
+		th = { area = areaId, t = {}, pruned = now }
+		tileHit[player] = th
+	elseif now - th.pruned > 4 then
+		-- forget tiles that were left behind
+		local keep = {}
+		for idx, t in pairs(th.t) do
+			if now - t < 2 then
+				keep[idx] = t
+			end
+		end
+		th.t = keep
+		th.pruned = now
+	end
+	local timers = th.t
 	local col, row = Areas.tileCoord(areaId, pos)
 	local reach = math.ceil(s.radius / TILE)
 	local r2 = (s.radius + TILE * 0.35) ^ 2
@@ -156,7 +176,11 @@ local function mowerHit(player, pr, areaId, pos, s)
 						local dx = ox + (cc + 0.5) * TILE - pos.X
 						local dz = oz + (rr + 0.5) * TILE - pos.Z
 						if dx * dx + dz * dz <= r2 then
-							damage(player, pr, areaId, idx, s.damage, s.eff)
+							local last = timers[idx]
+							if not last or now - last >= interval then
+								timers[idx] = now
+								damage(player, pr, areaId, idx, s.damage, s.eff)
+							end
 							hits += 1
 						end
 					end
@@ -226,6 +250,7 @@ local function nearSell(pos, areaId)
 	return false
 end
 
+local lastSync = 0
 local function step()
 	local now = os.clock()
 	-- regrow
@@ -264,14 +289,15 @@ local function step()
 			if areaId and areaId >= 1 and areaId <= pr.areasUnlocked and bossArea == 0 then
 				local full = bagFull(player, pr) and handleFull(player, pr, now)
 				if not full then
-					if now >= (nextHit[player] or 0) then
-						local s = Data.mowStats(player)
-						local mult = (clickUntil[player] or 0) > now and Game.Click.mult or 1
-						nextHit[player] = now + 1 / (s.speed * mult)
-						lastHit[player] = now
-						if mowerHit(player, pr, areaId, pos, s) > 0 then
-							mowingUntil[player] = now + 1 / (s.speed * mult) + 0.35
-						end
+					local sc = statCache[player]
+					if not sc or now - sc[2] > 0.2 then
+						sc = { Data.mowStats(player), now }
+						statCache[player] = sc
+					end
+					local s = sc[1]
+					local mult = (clickUntil[player] or 0) > now and Game.Click.mult or 1
+					if mowerHit(player, pr, areaId, pos, s, now, 1 / (s.speed * mult)) > 0 then
+						mowingUntil[player] = now + 0.35
 					end
 					if now >= (nextWorker[player] or 0) then
 						nextWorker[player] = now + 1
@@ -291,6 +317,10 @@ local function step()
 		Remotes.GrassFx:FireAllClients(areaId, batch)
 		fxBatch[areaId] = nil
 	end
+	if now - lastSync < SYNC then
+		return
+	end
+	lastSync = now
 	for player, d in pairs(dirty) do
 		if player.Parent then
 			if d.progress then
@@ -346,12 +376,12 @@ function Grass.init()
 	local acc = 0
 	RunService.Heartbeat:Connect(function(dt)
 		acc += dt
-		if acc >= 0.1 then
+		if acc >= STEP then
 			acc = 0
 			step()
 		end
 	end)
-	-- A click never says what was cut: it only shortens the wait until this player's next hit.
+	-- A click never says what was cut: it only shortens the wait between this player's hits.
 	Remotes.Input.OnServerEvent:Connect(function(player, kind)
 		if kind ~= "cut" or not Data.get(player) then
 			return
@@ -359,14 +389,12 @@ function Grass.init()
 		clickUntil[player] = os.clock() + Game.Click.window
 		-- a counter other clients watch to play this player's scissors chop
 		player:SetAttribute("Swing", ((player:GetAttribute("Swing") or 0) + 1) % 1000)
-		local boosted = (lastHit[player] or 0) + 1 / (Data.mowStats(player).speed * Game.Click.mult)
-		nextHit[player] = math.min(nextHit[player] or 0, boosted)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
-		lastHit[player] = nil
+		tileHit[player] = nil
+		statCache[player] = nil
 		clickUntil[player] = nil
 		mowingUntil[player] = nil
-		nextHit[player] = nil
 		nextWorker[player] = nil
 		lastFullWarn[player] = nil
 		dirty[player] = nil

@@ -28,6 +28,10 @@ Areas.MILESTONE_CASH = { 150, 400, 900, 2500 } -- x grass value
 
 -- Boss fights happen in a separate arena, one per fight, built far away from the islands.
 Areas.BOSS_ZONE = Areas.ARENA_RADIUS + 2 -- stepping this close to a boss opens the fight prompt
+-- The boss portal: a green circle in front of the castle gate in town. Standing on it opens
+-- a menu to fight any boss the player has unlocked, alone or with the rest of the server.
+Areas.PORTAL_POS = Vector3.new(0, 0, -172)
+Areas.PORTAL_RADIUS = 13
 Areas.FIGHT_RADIUS = 58 -- size of the fight arena
 Areas.FIGHT_ORIGIN = Vector3.new(0, 300, 5000) -- first arena; more are placed along +X
 Areas.FIGHT_SPACING = 420

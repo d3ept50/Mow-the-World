@@ -469,7 +469,9 @@ local function release(f, player, back: boolean)
 	player:SetAttribute("BossFight", 0)
 	player:SetAttribute("WorkerHP", nil)
 	if back then
-		local pos = Areas.bossReturnPos(f.areaId)
+		-- players who came through the portal in town go back there
+		local pos = f.back[player] or Areas.bossReturnPos(f.areaId)
+		f.back[player] = nil
 		teleport(player, CFrame.lookAt(pos, pos + V(0, 0, 1))) -- facing away from the boss, towards the grass
 	end
 end
@@ -586,6 +588,7 @@ local function start(areaId: number, list)
 		id = id, areaId = areaId, slot = slot, arena = arena, center = center, model = model,
 		pos = center, dir = V(0, 0, 1), rage = 1, active = true, players = {},
 		hp = hp, maxHp = hp, endsAt = os.clock() + CFG.time, fill = fill, hpText = hpText,
+		back = {}, -- [player] = where to put them afterwards, if not beside the boss's plaza
 	}
 	fights[id] = f
 	model:SetAttribute("Active", true)
@@ -605,6 +608,10 @@ local function start(areaId: number, list)
 		for _, w in ipairs(squad) do
 			w.maxHp = w.hp
 			w.ko = false
+		end
+		local hrp = alive(player)
+		if hrp and flatDist(hrp.Position, Areas.PORTAL_POS) <= Areas.PORTAL_RADIUS + 10 then
+			f.back[player] = Areas.PORTAL_POS + V(0, 5, Areas.PORTAL_RADIUS + 8)
 		end
 		local entry = { dealt = 0, squad = squad, nextHit = 0, wiped = false }
 		f.players[player] = entry
@@ -644,8 +651,9 @@ local function eligible(player, areaId: number, mustBeNear: boolean)
 	if not hrp then
 		return fail("You can't do that right now.")
 	end
-	if mustBeNear and flatDist(hrp.Position, a.bossPos) > Areas.BOSS_ZONE + 14 then
-		return fail("Walk up to the " .. a.boss.name .. " first.")
+	-- start a fight from the boss's own plaza, or from the boss portal by the castle
+	if mustBeNear and flatDist(hrp.Position, a.bossPos) > Areas.BOSS_ZONE + 14 and flatDist(hrp.Position, Areas.PORTAL_POS) > Areas.PORTAL_RADIUS + 10 then
+		return fail("Walk up to the " .. a.boss.name .. " or the boss portal first.")
 	end
 	return true
 end
