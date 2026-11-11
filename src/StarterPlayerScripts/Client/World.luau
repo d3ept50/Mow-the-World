@@ -201,7 +201,7 @@ local function tilesOf(areaId)
 	local cache = tileCache[areaId]
 	if not cache then
 		local folder = workspace:FindFirstChild("Grass") and workspace.Grass:FindFirstChild(tostring(areaId))
-		if not folder or #folder:GetChildren() < Areas.TILES then
+		if not folder or #folder:GetChildren() < Areas.TILE_COUNT then
 			return nil
 		end
 		cache = {}

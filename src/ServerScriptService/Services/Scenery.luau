@@ -446,6 +446,78 @@ function Scenery.cottage(rng: Random): Model
 	return m
 end
 
+---------------------------------------------------------------- cartoon town houses
+-- Chunky, brightly coloured houses for the marketplace town: fat roofs that overhang,
+-- big round windows, striped awnings and wonky chimneys. The door faces -Z.
+local TOWN_WALLS = {
+	rgb(255, 214, 140), rgb(255, 170, 150), rgb(160, 215, 255), rgb(190, 235, 170), rgb(255, 190, 220),
+	rgb(215, 190, 255), rgb(255, 236, 190), rgb(170, 230, 220),
+}
+local TOWN_ROOFS = { rgb(226, 74, 64), rgb(60, 130, 220), rgb(70, 170, 100), rgb(150, 90, 210), rgb(240, 140, 50), rgb(40, 170, 170) }
+local CREAM, WOODC = rgb(255, 250, 240), rgb(140, 92, 56)
+
+function Scenery.townHouse(rng: Random, lit: boolean?): Model
+	local m = Instance.new("Model")
+	m.Name = "House"
+	local floors = rng:NextInteger(1, 3)
+	local w, d = rng:NextInteger(16, 22), rng:NextInteger(14, 18)
+	local fh = 9 -- height of one floor
+	local wall = TOWN_WALLS[rng:NextInteger(1, #TOWN_WALLS)]
+	local rc = TOWN_ROOFS[rng:NextInteger(1, #TOWN_ROOFS)]
+	local dark = wall:Lerp(rgb(0, 0, 0), 0.25)
+	local front = -d / 2
+	B(m, V(w + 2, 3, d + 2), CF(0, -0.5, 0), rgb(170, 160, 150), "Cobblestone")
+	for f = 1, floors do
+		-- each floor is a little wider than the one below, like a storybook house
+		local grow = (f - 1) * 1.2
+		local y = 1 + (f - 0.5) * fh
+		B(m, V(w + grow, fh, d + grow), CF(0, y, 0), f % 2 == 1 and wall or wall:Lerp(CREAM, 0.45), "Plaster")
+		D(m, V(w + grow + 1, 1, d + grow + 1), CF(0, y + fh / 2, 0), dark, "Wood")
+		local z = front - grow / 2
+		if f == 1 then
+			-- door with a round top, a step and a striped awning
+			D(m, V(4, 6.4, 0.6), CF(0, 4.2, z - 0.1), WOODC, "WoodPlanks")
+			D(m, V(0.6, 4, 4), CF(0, 7.4, z - 0.1) * ANG(0, rad(90), 0), WOODC, "WoodPlanks", "Cylinder")
+			D(m, V(0.5, 0.5, 0.5), CF(1.3, 4.2, z - 0.5), rgb(255, 215, 80), "Metal", "Ball")
+			D(m, V(5.4, 0.6, 2.4), CF(0, 1.3, z - 1.2), rgb(190, 180, 170), "Cobblestone")
+			for i = 0, 4 do
+				D(m, V(1.5, 0.35, 3), CF(-3 + i * 1.5, fh + 0.2, z - 1.4) * ANG(rad(-26), 0, 0), i % 2 == 0 and rc or CREAM, "Fabric")
+			end
+		end
+		for _, sx in ipairs({ -1, 1 }) do
+			if f > 1 or w >= 18 then
+				local x = sx * (w / 2 - 3.6)
+				local wy = y + 0.6
+				-- round window in a thick white frame
+				D(m, V(0.5, 4.4, 4.4), CF(x, wy, z - 0.05) * ANG(0, rad(90), 0), CREAM, nil, "Cylinder")
+				local glass = D(m, V(0.6, 3.3, 3.3), CF(x, wy, z - 0.1) * ANG(0, rad(90), 0), lit and rgb(255, 228, 150) or rgb(150, 205, 240), lit and "Neon" or "Glass", "Cylinder")
+				D(m, V(3.3, 0.35, 0.8), CF(x, wy, z - 0.15), CREAM)
+				D(m, V(0.35, 3.3, 0.8), CF(x, wy, z - 0.15), CREAM)
+				D(m, V(3.8, 1, 1.2), CF(x, wy - 2.9, z - 0.6), WOODC, "WoodPlanks")
+				D(m, V(3.4, 1.3, 1), CF(x, wy - 2, z - 0.6), Color3.fromHSV(rng:NextNumber(), 0.65, 1), "Grass")
+				if lit and sx == 1 and f == floors then
+					light(glass, rgb(255, 220, 150), 20, 0.9)
+				end
+			end
+		end
+	end
+	local top = 1 + floors * fh
+	local grow = (floors - 1) * 1.2
+	roof(m, CF(0, top, 0), w + grow + 5, d + grow + 6, 8.5, rc, "Slate")
+	D(m, V(w + grow + 5.4, 1.2, 1.4), CF(0, top + 8.4, 0), rc:Lerp(rgb(0, 0, 0), 0.25), "Slate") -- ridge
+	-- a chimney that leans a little
+	local cx = (w / 2 - 4) * (rng:NextInteger(0, 1) == 0 and -1 or 1)
+	local lean = ANG(0, 0, rad(rng:NextNumber(-7, 7)))
+	B(m, V(3, 9, 3), CF(cx, top + 5, d / 5) * lean, rgb(190, 110, 90), "Brick")
+	local pot = D(m, V(3.8, 1, 3.8), CF(cx, top + 5, d / 5) * lean * CF(0, 5, 0), rgb(120, 76, 66), "Brick")
+	if lit then
+		local smoke = particles(pot, rgb(235, 235, 240), 3, 3, 2.6, 3.5)
+		smoke.LightEmission = 0
+	end
+	m.WorldPivot = CF(0, 0, 0)
+	return m
+end
+
 Scenery.B, Scenery.D, Scenery.Wg, Scenery.cylV, Scenery.light, Scenery.particles = B, D, Wg, cylV, light, particles
 
 return Scenery
