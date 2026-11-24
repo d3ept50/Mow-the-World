@@ -422,12 +422,150 @@ function Models.crate(id: string): Model
 end
 
 ---------------------------------------------------------------- Bosses
+-- Hand-made bosses, built from a spec in docs/models. Each gets the model (with its Root
+-- already in place), the boss config and its size S, builds around the origin facing -Z with
+-- its feet on y = 0, and returns the part the boss's glow goes on. Bosses without one here
+-- use the generic body below.
+local BOSS_BUILDERS = {}
+
+-- A serrated dandelion leaf. cf is the leaf's base, with its length along cf's Y axis.
+local function dandelionLeaf(m, cf, L, W, color, rib, thick)
+	local mid = cf * CF(0, L / 2, 0)
+	P(m, V(W, L, thick), mid, color, "Grass")
+	P(m, V(W * 0.14, L * 0.94, thick * 1.3), mid, rib, "SmoothPlastic")
+	for k = 1, 3 do
+		local y = L * (k / 4) - L / 2
+		for _, sx in ipairs({ -1, 1 }) do
+			local tooth = W * (0.42 - k * 0.06)
+			P(m, V(tooth, tooth, thick), mid * CF(sx * W * 0.5, y, 0) * ANG(0, 0, rad(45)), color, "Grass")
+		end
+	end
+	P(m, V(W * 0.5, W * 0.5, thick), mid * CF(0, L / 2, 0) * ANG(0, 0, rad(45)), color, "Grass")
+end
+
+-- Dandelion Brute (area 1): see docs/models/dandelion_brute.md
+BOSS_BUILDERS[1] = function(m, B, S)
+	local stem, leafC, ribC = rgb(70, 160, 60), rgb(46, 120, 48), rgb(100, 180, 80)
+	local belly, petal, petal2 = rgb(130, 200, 90), rgb(255, 224, 70), rgb(255, 240, 120)
+	local centre, seedDot, roots = rgb(255, 190, 40), rgb(230, 150, 32), rgb(120, 84, 58)
+	local puffC, eye, ink = rgb(248, 248, 242), rgb(255, 60, 40), rgb(60, 30, 20)
+	local function at(x, y, z)
+		return CF(x * S, y * S, z * S)
+	end
+
+	-- root feet with three toes each, on short stem legs
+	for _, sx in ipairs({ -1, 1 }) do
+		P(m, V(0.26 * S, 0.12 * S, 0.34 * S), at(sx * 0.2, 0.06, -0.04), roots, "Wood")
+		for k = -1, 1 do
+			P(m, V(0.07 * S, 0.06 * S, 0.2 * S), at(sx * 0.2 + k * 0.08, 0.03, -0.24) * ANG(0, rad(k * -20), 0), roots, "Wood")
+		end
+		cyl(m, 0.22 * S, 0.15 * S, V(sx * 0.2 * S, 0.2 * S, 0), stem, "Grass")
+	end
+
+	-- round leafy body with a lighter belly
+	local body = P(m, V(0.82 * S, 0.82 * S, 0.82 * S), at(0, 0.62, 0), stem, "Grass", "Ball")
+	body.Name = "Body"
+	P(m, V(0.5 * S, 0.5 * S, 0.5 * S), at(0, 0.56, -0.2), belly, "Grass", "Ball")
+
+	-- collar of 8 leaves fanning up and out round the neck
+	for i = 0, 7 do
+		local cf = at(0, 0.98, 0) * ANG(0, rad(i * 45 + 22.5), 0) * CF(0, 0, 0.22 * S) * ANG(rad(55), 0, 0)
+		dandelionLeaf(m, cf, 0.32 * S, 0.13 * S, leafC, ribC, 0.04 * S)
+	end
+	cyl(m, 0.14 * S, 0.15 * S, V(0, 1.06 * S, 0), stem, "Grass")
+
+	-- the flower head: a seedy centre disc facing forward, 16 outer and 12 inner petals
+	local headY, headZ = 1.42, -0.04
+	local disc = at(0, headY, headZ) * ANG(0, rad(90), 0)
+	P(m, V(0.06 * S, 0.5 * S, 0.5 * S), disc * CF(-0.1 * S, 0, 0), leafC, "Grass", "Cylinder") -- green back
+	P(m, V(0.16 * S, 0.62 * S, 0.62 * S), disc, centre, "SmoothPlastic", "Cylinder")
+	local face = (headZ - 0.09) * S -- z of the front of the disc
+	for i = 0, 9 do
+		local a = rad(i * 36 + 18)
+		P(m, V(0.05 * S, 0.05 * S, 0.05 * S), CF(math.sin(a) * 0.25 * S, headY * S + math.cos(a) * 0.25 * S, face), seedDot, "SmoothPlastic", "Ball")
+	end
+	local function petals(count, L, W, startR, dz, tilt, offset, color)
+		for i = 0, count - 1 do
+			local cf = at(0, headY, headZ + dz) * ANG(0, 0, rad(i * 360 / count + offset)) * CF(0, startR * S + L * S / 2, 0) * ANG(rad(tilt), 0, 0)
+			P(m, V(W * S, L * S, 0.045 * S), cf, color, "SmoothPlastic")
+		end
+	end
+	petals(16, 0.36, 0.12, 0.27, 0.02, -10, 0, petal)
+	petals(12, 0.24, 0.1, 0.25, -0.03, -20, 15, petal2)
+
+	-- angry face: red glowing eyes, heavy brows, a jagged grin
+	local pupil
+	for _, sx in ipairs({ -1, 1 }) do
+		P(m, V(0.15 * S, 0.15 * S, 0.15 * S), CF(sx * 0.11 * S, (headY + 0.05) * S, face), Color3.new(1, 1, 1), "SmoothPlastic", "Ball")
+		pupil = P(m, V(0.07 * S, 0.07 * S, 0.07 * S), CF(sx * 0.1 * S, (headY + 0.045) * S, face - 0.06 * S), eye, "Neon", "Ball")
+		P(m, V(0.17 * S, 0.045 * S, 0.04 * S), CF(sx * 0.11 * S, (headY + 0.15) * S, face - 0.03 * S) * ANG(0, 0, rad(sx * 24)), ink)
+	end
+	glow(pupil, eye, S * 1.2)
+	P(m, V(0.26 * S, 0.07 * S, 0.03 * S), CF(0, (headY - 0.11) * S, face - 0.02 * S), ink)
+	for i, x in ipairs({ -0.09, -0.03, 0.03, 0.09 }) do
+		local y = i % 2 == 0 and headY - 0.09 or headY - 0.13
+		P(m, V(0.045 * S, 0.05 * S, 0.03 * S), CF(x * S, y * S, face - 0.035 * S), Color3.new(1, 1, 1))
+	end
+
+	-- arms: leafy shoulder guards, stem arms, round fists
+	local fists = {}
+	for _, sx in ipairs({ -1, 1 }) do
+		P(m, V(0.3 * S, 0.3 * S, 0.3 * S), at(sx * 0.46, 0.86, 0), leafC, "Grass", "Ball")
+		dandelionLeaf(m, at(sx * 0.46, 0.95, 0) * ANG(0, 0, rad(-sx * 60)), 0.3 * S, 0.14 * S, leafC, ribC, 0.04 * S)
+		P(m, V(0.17 * S, 0.4 * S, 0.17 * S), at(sx * 0.56, 0.66, -0.02) * ANG(0, 0, rad(sx * 20)), stem, "Grass")
+		fists[sx] = at(sx * 0.63, 0.45, -0.04)
+		P(m, V(0.26 * S, 0.26 * S, 0.26 * S), fists[sx], leafC, "Grass", "Ball")
+	end
+	-- left hand: three leaves hanging down like claws
+	for k = -1, 1 do
+		dandelionLeaf(m, fists[-1] * ANG(0, 0, rad(k * 25)) * ANG(rad(180), 0, 0) * CF(0, 0.08 * S, 0), 0.3 * S, 0.12 * S, leafC, ribC, 0.035 * S)
+	end
+	-- right hand: the seed-puff club, tilted outwards, with 14 seed spikes
+	local tilt = fists[1] * ANG(0, 0, rad(-15))
+	P(m, V(0.8 * S, 0.07 * S, 0.07 * S), tilt * CF(0, 0.4 * S, 0) * ANG(0, 0, rad(90)), stem, "Grass", "Cylinder")
+	local centrePos = (tilt * CF(0, 0.88 * S, 0)).Position
+	local puff = P(m, V(0.46 * S, 0.46 * S, 0.46 * S), CF(centrePos), puffC, "SmoothPlastic", "Ball")
+	puff.Transparency = 0.15
+	P(m, V(0.16 * S, 0.16 * S, 0.16 * S), CF(centrePos), rgb(220, 200, 150), "SmoothPlastic", "Ball")
+	local n = 14
+	for i = 0, n - 1 do
+		-- spread evenly over a sphere (golden angle spiral)
+		local y = 1 - 2 * (i + 0.5) / n
+		local r = math.sqrt(1 - y * y)
+		local a = i * 2.39996
+		local dir = V(math.cos(a) * r, y, math.sin(a) * r)
+		local base = CFrame.lookAt(centrePos, centrePos + dir)
+		P(m, V(0.02 * S, 0.2 * S, 0.02 * S), base * CF(0, 0, -0.27 * S) * ANG(rad(-90), 0, 0), puffC)
+		P(m, V(0.06 * S, 0.06 * S, 0.06 * S), base * CF(0, 0, -0.38 * S), puffC, "Neon", "Ball")
+	end
+	glow(puff, puffC, S * 1.6, 5)
+	local seeds = puff:FindFirstChildOfClass("ParticleEmitter")
+	if seeds then
+		-- seeds drift off slowly and float upwards
+		seeds.Speed = NumberRange.new(0.5, 1.5)
+		seeds.Acceleration = V(0, 1.5, 0)
+		seeds.Lifetime = NumberRange.new(2, 3.5)
+		seeds.Drag = 1
+	end
+	return body
+end
+
 function Models.boss(areaId: number): Model
 	local B = Areas.List[areaId].boss
 	local S = B.size
 	local m = Instance.new("Model")
 	m.Name = "Boss"
 	local root = rootPart(m)
+	local custom = BOSS_BUILDERS[areaId]
+	if custom then
+		custom(m, B, S)
+		for _, d in ipairs(m:GetDescendants()) do
+			if d:IsA("BasePart") and d ~= root then
+				d.CastShadow = true
+			end
+		end
+		return m
+	end
 	local body
 	if B.body == "ball" then
 		body = P(m, V(S, S, S), CF(0, S * 0.55, 0), B.color, B.mat, "Ball")
