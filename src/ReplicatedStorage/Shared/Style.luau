@@ -1,13 +1,13 @@
--- The game's look: natural, muted colours with real materials and soft, detailed lighting.
+-- The game's look: bright, saturated cartoon colours with real materials and warm, soft lighting.
 -- Every builder (world, scenery, models, grass) passes its colours and materials through
 -- here, and WorldBuilder and the client read the lighting numbers, so the whole style is
 -- tuned in this one file.
 local Style = {}
 
 ---------------------------------------------------------------- colours
-Style.SATURATION = 0.9 -- multiplies each colour's saturation (1 = as written in the configs)
+Style.SATURATION = 1.06 -- multiplies each colour's saturation (1 = as written in the configs)
 Style.SATURATION_ADD = 0 -- then adds this much
-Style.BRIGHTNESS = 1 -- multiplies each colour's brightness
+Style.BRIGHTNESS = 1.02 -- multiplies each colour's brightness
 Style.GREY_BELOW = 0.1 -- colours less saturated than this are left alone
 
 ---------------------------------------------------------------- materials
@@ -20,39 +20,39 @@ Style.KEEP_MATERIAL = { Neon = true, Glass = true, ForceField = true }
 -- The lighting technology itself (Future) is set in default.project.json, because scripts
 -- are not allowed to change it.
 Style.Lighting = {
-	brightness = 2.6,
-	exposure = 0,
-	shadowSoftness = 0.15, -- crisp, slightly soft shadow edges
-	sunTint = Color3.fromRGB(255, 240, 222), -- warm sunlight
+	brightness = 2.9,
+	exposure = 0.08,
+	shadowSoftness = 0.2, -- crisp, slightly soft shadow edges
+	sunTint = Color3.fromRGB(255, 236, 212), -- warm sunlight
 	-- colour grading
-	saturation = 0.06,
-	contrast = 0.06,
-	gradeBrightness = 0,
+	saturation = 0.14,
+	contrast = 0.1,
+	gradeBrightness = 0.01,
 	-- glow around bright and neon things
-	bloomIntensity = 0.22,
-	bloomSize = 28,
-	bloomThreshold = 1.6,
-	sunRays = 0.07,
+	bloomIntensity = 0.3,
+	bloomSize = 26,
+	bloomThreshold = 1.4,
+	sunRays = 0.09,
 	-- a touch of blur on the far distance
-	farBlur = 0.07,
-	focusDistance = 90,
-	inFocusRadius = 320,
+	farBlur = 0.1,
+	focusDistance = 80,
+	inFocusRadius = 300,
 }
 
 ---------------------------------------------------------------- sky and air (read by the client)
 -- Each area sets its own ambient light and fog colour; these scale them.
-Style.AMBIENT = 0.55 -- ambient light in shade: lower = deeper, more defined shadows
-Style.OUTDOOR_AMBIENT = 0.8 -- fill light in open air
+Style.AMBIENT = 0.6 -- ambient light in shade: lower = deeper, more defined shadows
+Style.OUTDOOR_AMBIENT = 0.85 -- fill light in open air
 Style.FOG = 0.55 -- multiplies each area's fog density
-Style.HAZE = 1.4 -- soft haze towards the horizon
+Style.HAZE = 1.1 -- soft haze towards the horizon
 Style.GLARE = 0.25 -- glow of the air around the sun
 Style.AIR_OFFSET = 0.15 -- how far the haze sits from the camera
 
 ---------------------------------------------------------------- water (read by WorldBuilder)
 Style.Water = {
-	color = Color3.fromRGB(46, 138, 178),
-	transparency = 0.45,
-	reflectance = 0.55,
+	color = Color3.fromRGB(34, 168, 196), -- clear turquoise
+	transparency = 0.38,
+	reflectance = 0.5,
 	waveSize = 0.14,
 	waveSpeed = 8,
 }

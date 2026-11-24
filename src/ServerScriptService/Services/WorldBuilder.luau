@@ -27,7 +27,8 @@ local GATE_W = 26
 local FENCE_INSET = 5
 local MARKET_CUT = 30 -- how much of each corner of the town island is cut off
 local EDGE_BACK = 9 -- how far inside the cliff line the invisible wall stands
-local LAYOUT_VERSION = 9 -- bump to force the terrain to be baked again
+local WALK = 10 -- width of the stone walk around each grass field
+local LAYOUT_VERSION = 10 -- bump to force the terrain to be baked again
 local WATER_Y = -4
 -- Smooth terrain renders 2 studs above the filled volume, so the islands are filled up to TOP:
 -- the visible ground then sits at about y = -0.3, just below where the parts are built (y = 0).
@@ -136,7 +137,8 @@ end
 local SIDE_DIR = { ["x+"] = V(1, 0, 0), ["x-"] = V(-1, 0, 0), ["z+"] = V(0, 0, 1), ["z-"] = V(0, 0, -1) }
 local openingsOf = {} -- [areaId] = { { side, offset } }, 0 = marketplace
 
--- every bridge: marketplace <-> neighbouring areas, and each area <-> the next one
+-- every bridge: the town <-> one area on each of its sides (Areas.TOWN_LINKS), each area <-> the
+-- next one, and the last area <-> the first, so the ring of islands is closed
 local function links()
 	local map = Areas.CellMap
 	local list = {}
@@ -144,7 +146,8 @@ local function links()
 		if a == nil or b == nil or (a == 0 and b == 0) then
 			return
 		end
-		if a == 0 or b == 0 or math.abs(a - b) == 1 then
+		local town = a == 0 or b == 0
+		if (town and Areas.TOWN_LINKS[math.max(a, b)]) or (not town and (math.abs(a - b) == 1 or math.abs(a - b) == Areas.COUNT - 1)) then
 			table.insert(list, { axis = axis, fixed = fixed, lateral = mid, low = a, high = b })
 		end
 	end
@@ -307,7 +310,7 @@ function WB.buildTerrain(force: boolean?)
 			local ar = Areas.ARENA_RADIUS - 1
 			repave(terrain, c.X - H, c.Z - H, c.X + H, c.Z + H, function(x, z)
 				local dx, dz = x - c.X, z - c.Z
-				if math.abs(dx) < side / 2 - 1 and math.abs(dz) < side / 2 - 1 then
+				if math.abs(dx) < side / 2 + 1.5 + WALK and math.abs(dz) < side / 2 + 1.5 + WALK then
 					return true
 				end
 				if (V(x, 0, z) - a.bossPos).Magnitude < ar or (V(x, 0, z) - a.sellPos).Magnitude < 7 then
@@ -562,7 +565,7 @@ local function edgeLoop(parent, center, half, cut, openings, st, seed)
 end
 
 ---------------------------------------------------------------- bridges & gates
-local function gate(parent, axis, along, lateral, areaId, span)
+local function gate(parent, axis, along, lateral, areaId, span, fromPos)
 	local a = Areas.List[areaId]
 	local function at(l, y)
 		return axis == "x" and V(along, y, lateral + l) or V(lateral + l, y, along)
@@ -589,6 +592,7 @@ local function gate(parent, axis, along, lateral, areaId, span)
 	barrier.CastShadow = false
 	barrier:SetAttribute("Area", areaId)
 	barrier:SetAttribute("Span", span) -- length of the bridge behind it, for the guide arrow
+	barrier:SetAttribute("From", fromPos) -- where the bridge starts, on the island it comes from
 	CollectionService:AddTag(barrier, "Gate")
 	local prev = Areas.List[areaId - 1]
 	local bb = billboard(barrier, "🔒 " .. a.name .. (prev and ("\nDefeat the " .. prev.boss.name) or ""), 22, 7, 0, WHITE)
@@ -642,7 +646,10 @@ local function bridge(parent, axis, fixed, lateral, idLow, idHigh)
 		end
 	end
 	local plusHigh = idHigh == id
-	gate(parent, axis, fixed + (plusHigh and 1 or -1) * (GAP / 2 - 1), lateral, id, to - from)
+	-- the gate stands at the area's end of the bridge; the other end is where the walk starts
+	local startAlong = plusHigh and from or to
+	local fromPos = axis == "x" and V(startAlong, 0, lateral) or V(lateral, 0, startAlong)
+	gate(parent, axis, fixed + (plusHigh and 1 or -1) * (GAP / 2 - 1), lateral, id, to - from, fromPos)
 end
 
 local function pathStrip(parent, p1, p2, width, color, mat)
@@ -685,20 +692,64 @@ end
 ---------------------------------------------------------------- areas
 local GRASSY = { [1] = true, [2] = true, [3] = true, [8] = true, [11] = true }
 
+-- The mown lawn under the grass: wide stripes in two shades, like a freshly cut field.
+-- They show wherever the grass has been cut. The stripes run across the way in.
+local function lawn(folder, a, side)
+	local c = a.center
+	local n = Areas.GRID // 2 -- one stripe every two rows of tiles
+	local w = side / n
+	local light = a.cut:Lerp(WHITE, 0.14)
+	local dark = a.cut:Lerp(rgb(0, 0, 0), 0.08)
+	local alongX = math.abs(a.front.X) > 0.5
+	for i = 1, n do
+		local off = -side / 2 + (i - 0.5) * w
+		local size = alongX and V(w, 2.4, side) or V(side, 2.4, w)
+		local pos = c + a.front * off + V(0, -0.95, 0)
+		local stripe = part(folder, size, pos, i % 2 == 0 and light or dark, a.mat)
+		stripe.Name = "Field"
+		stripe.CastShadow = false
+	end
+end
+
+-- A stone walk all the way round the field, with a kerb on the outside and a lamp at each corner.
+local function fieldWalk(folder, a, side, color, rng)
+	local c = a.center
+	local inner = side / 2 + 1.5
+	local mid = inner + WALK / 2
+	local outer = inner + WALK
+	local kerb = color:Lerp(rgb(0, 0, 0), 0.22)
+	for _, s in ipairs({ -1, 1 }) do
+		part(folder, V(2 * outer, 1.6, WALK), c + V(0, -0.55, s * mid), color, "Cobblestone").CastShadow = false
+		part(folder, V(WALK, 1.6, 2 * inner), c + V(s * mid, -0.55, 0), color, "Cobblestone").CastShadow = false
+		deco(folder, V(2 * outer + 2, 1.9, 1), c + V(0, -0.45, s * (outer + 0.5)), kerb, "Slate").CastShadow = false
+		deco(folder, V(1, 1.9, 2 * outer + 2), c + V(s * (outer + 0.5), -0.45, 0), kerb, "Slate").CastShadow = false
+	end
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			local at = c + V(sx * mid, 0, sz * mid)
+			local lamp = Models.prop("lamp", { a.grass, a.wall, a.grass:Lerp(WHITE, 0.3) }, rng)
+			lamp.WorldPivot = CF(0, 0, 0)
+			lamp:PivotTo(CFrame.lookAt(at, V(c.X, 0, c.Z)) + SINK)
+			lamp.Parent = folder
+		end
+	end
+end
+
 local function buildArea(world, a)
 	local folder = Instance.new("Folder")
 	folder.Name = "Area" .. a.id
 	local c = a.center
 	local side = Areas.GRID * Areas.TILE
-	local field = part(folder, V(side, 2.4, side), c + V(0, -0.95, 0), a.cut, a.mat)
-	field.Name = "Field"
-	field.CastShadow = false
+	lawn(folder, a, side)
 	-- raised border around the field
 	local trim = a.wall:Lerp(rgb(0, 0, 0), 0.15)
 	for _, s in ipairs({ -1, 1 }) do
 		deco(folder, V(side + 3, 2.4, 1.5), c + V(0, -0.5, s * (side / 2 + 0.75)), trim, "Slate").CastShadow = false
 		deco(folder, V(1.5, 2.4, side + 3), c + V(s * (side / 2 + 0.75), -0.5, 0), trim, "Slate").CastShadow = false
 	end
+	local rng = Random.new(a.id * 77)
+	local pathC = a.wall:Lerp(a.ground, 0.35)
+	fieldWalk(folder, a, side, pathC, rng)
 	sellStation(folder, a.sellPos)
 
 	-- the boss's plaza: a stone square in the middle of the grass, with a glowing obelisk at each corner
@@ -725,10 +776,10 @@ local function buildArea(world, a)
 	edge.Name = "Edge"
 	edgeLoop(edge, c, H, 44, openings, EDGES[a.id] or EDGES[1], a.id * 13)
 	edge.Parent = folder
-	local pathC = a.wall:Lerp(a.ground, 0.35)
+	local walkOuter = side / 2 + 1.5 + WALK
 	for _, o in ipairs(openings) do
 		local d = SIDE_DIR[o.side]
-		pathStrip(folder, c + d * (H + 2), c + d * (side / 2 + 1.5), 18, pathC, "Cobblestone")
+		pathStrip(folder, c + d * (H + 2), c + d * walkOuter, 18, pathC, "Cobblestone")
 	end
 
 	local lm = Scenery.landmark(a.id)
@@ -738,59 +789,75 @@ local function buildArea(world, a)
 		lm.Parent = folder
 	end
 
-	-- themed decorations around the field
-	local rng = Random.new(a.id * 77)
+	-- themed decorations between the walk and the cliffs. They grow in groves with open
+	-- ground between them, and keep clear of the paths, the sell pad and the landmark.
 	local props = Instance.new("Folder")
 	props.Name = "Props"
-	local lim = H - 26
-	local function free(x, z, margin)
-		if math.abs(x) < side / 2 + margin and math.abs(z) < side / 2 + margin then
+	local lim = H - 22
+	local sellRel, landRel = a.sellPos - c, a.landmarkPos - c
+	local spots = {} -- { x, z, radius } of everything placed so far
+	local function free(x, z, r)
+		if math.abs(x) < walkOuter + 2 + r and math.abs(z) < walkOuter + 2 + r then
 			return false
 		end
-		if math.abs(x) + math.abs(z) > 2 * lim - 30 then
+		if math.max(math.abs(x), math.abs(z)) > lim - r or math.abs(x) + math.abs(z) > 2 * lim - 30 - r then
 			return false
 		end
 		local p = V(x, 0, z)
-		if (p - Areas.SELL_OFFSET).Magnitude < 15 then
-			return false
-		end
-		if (p - Areas.LANDMARK_OFFSET).Magnitude < 30 then
+		if (p - sellRel).Magnitude < 14 + r or (p - landRel).Magnitude < 32 + r then
 			return false
 		end
 		for _, o in ipairs(openings) do
 			local d = SIDE_DIR[o.side]
-			if p:Dot(d) > 0 and math.abs(p:Dot(V(d.Z, 0, d.X))) < 14 then
+			if p:Dot(d) > 0 and math.abs(p:Dot(V(d.Z, 0, d.X))) < 13 + r then
+				return false
+			end
+		end
+		for _, sp in ipairs(spots) do
+			local dx, dz = sp[1] - x, sp[2] - z
+			if dx * dx + dz * dz < (sp[3] + r) ^ 2 then
 				return false
 			end
 		end
 		return true
 	end
 	local placed = 0
-	for _ = 1, 800 do
-		if placed >= 130 then
+	for _ = 1, 70 do
+		if placed >= 90 then
 			break
 		end
-		local x, z = rng:NextNumber(-lim, lim), rng:NextNumber(-lim, lim)
-		if free(x, z, 7) then
-			placed += 1
-			local kind = a.props[rng:NextInteger(1, #a.props)]
-			local m = placeProp(props, kind, a.pal, rng, c + V(x, 0, z), rng:NextNumber(1, 1.9), a.id >= 10)
-			if kind == "star" then
-				for _, d in ipairs(m:GetChildren()) do
-					CollectionService:AddTag(d, "Spin")
+		local gx, gz = rng:NextNumber(-lim, lim), rng:NextNumber(-lim, lim)
+		if free(gx, gz, 4) then
+			local main = a.props[rng:NextInteger(1, #a.props)]
+			for _ = 1, rng:NextInteger(4, 8) do
+				local ang, dist = rng:NextNumber(0, math.pi * 2), rng:NextNumber(0, 17)
+				local x, z = gx + math.cos(ang) * dist, gz + math.sin(ang) * dist
+				local scale = rng:NextNumber(1, 1.8)
+				local r = 2.6 * scale
+				if free(x, z, r) then
+					local kind = rng:NextNumber() < 0.7 and main or a.props[rng:NextInteger(1, #a.props)]
+					table.insert(spots, { x, z, r })
+					placed += 1
+					local m = placeProp(props, kind, a.pal, rng, c + V(x, 0, z), scale, a.id >= 10)
+					if kind == "star" then
+						for _, d in ipairs(m:GetChildren()) do
+							CollectionService:AddTag(d, "Spin")
+						end
+					end
 				end
 			end
 		end
 	end
-	local clutter = GRASSY[a.id] and { "tuft", "tuft", "bush", "flower" } or { "tuft", "tuft", "rock" }
+	local clutter = GRASSY[a.id] and { "tuft", "tuft", "bush", "flower", "flower" } or { "tuft", "tuft", "rock" }
 	placed = 0
-	for _ = 1, 600 do
-		if placed >= 100 then
+	for _ = 1, 700 do
+		if placed >= 90 then
 			break
 		end
 		local x, z = rng:NextNumber(-lim, lim), rng:NextNumber(-lim, lim)
-		if free(x, z, 3) then
+		if free(x, z, 1.4) then
 			placed += 1
+			table.insert(spots, { x, z, 1.4 })
 			local kind = clutter[rng:NextInteger(1, #clutter)]
 			placeProp(props, kind, a.pal, rng, c + V(x, 0, z), kind == "rock" and rng:NextNumber(0.3, 0.55) or rng:NextNumber(0.8, 1.3), a.id >= 10)
 		end
@@ -1108,7 +1175,7 @@ local function buildMarket(world)
 
 	-- The castle stands at the north end of town, behind the shops. It is scenery: an
 	-- invisible wall all the way round keeps players out.
-	local CASTLE_Z, CASTLE_W, CASTLE_D = -248, 70, 60 -- centre, half width, half depth of the fenced-off block
+	local CASTLE_Z, CASTLE_W, CASTLE_D = -290, 70, 60 -- centre, half width, half depth of the fenced-off block
 	local castle = Scenery.castle()
 	castle:PivotTo(CFrame.lookAt(V(0, 0, CASTLE_Z), V(0, 0, 0)) + SINK)
 	castle.Parent = m
@@ -1187,7 +1254,7 @@ local function buildMarket(world)
 		return true
 	end
 	local function house(pos, lookAt)
-		if #houses >= 96 or not fits(pos, 15) then
+		if #houses >= 150 or not fits(pos, 15) then
 			return
 		end
 		table.insert(houses, pos)
@@ -1220,7 +1287,7 @@ local function buildMarket(world)
 	local pal = { rgb(70, 170, 70), rgb(110, 80, 50), rgb(255, 150, 200) }
 	local count = 0
 	for _ = 1, 900 do
-		if count >= 36 then
+		if count >= 60 then
 			break
 		end
 		local pos = V(rng:NextNumber(-inner, inner), 0, rng:NextNumber(-inner, inner))

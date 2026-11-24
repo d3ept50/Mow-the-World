@@ -1,14 +1,23 @@
 -- Area definitions + world layout maths.
--- The world is a set of islands: a central marketplace island and one island per area,
--- joined by bridges. To add a new area: append to DEFS and add a free cell to RING
--- (and widen the grid if needed).
+-- The world is a set of islands: a central marketplace town and twelve area islands in a ring
+-- around it on a 4x4 grid, joined by bridges that are all the same length. The town fills the
+-- 2x2 block in the middle of the grid, so the sea between any two islands is the same width.
+-- To add a new area: append to DEFS and add a free cell to RING (and widen the grid if needed).
 local Areas = {}
 
-Areas.CELL = 400 -- size of one area island (studs)
-Areas.PITCH = 520 -- distance between neighbouring island centres
+Areas.CELL = 360 -- size of one area island (studs)
+Areas.PITCH = 470 -- distance between neighbouring island centres
 Areas.GAP = Areas.PITCH - Areas.CELL -- water between islands (bridge length)
-Areas.MARKET_HALF = 330 -- half size of the town island in the middle (its bridges are longer than the rest)
-Areas.LANDMARK_OFFSET = Vector3.new(148, 0, -148)
+-- half size of the town island: it reaches as far as the islands around it, leaving one GAP of sea
+Areas.MARKET_HALF = 1.5 * Areas.PITCH - Areas.CELL / 2 - Areas.GAP
+-- The areas the town has a bridge to: one on each side of town, turning like a pinwheel. Every
+-- area also has a bridge to the next one, so the ring can be walked all the way round.
+Areas.TOWN_LINKS = { [1] = true, [4] = true, [7] = true, [10] = true }
+-- Inside an area island everything is placed relative to its entrance (the bridge from the
+-- previous area, or from town for the first one): the sell pad just inside the entrance, the
+-- landmark in the back corner. Offsets are { along the entrance direction, to the side }.
+Areas.SELL_SPOT = { 128, 34 }
+Areas.LANDMARK_SPOT = { -122, -122 }
 Areas.TILE = 6 -- grass tile size
 Areas.GRID = 30 -- tiles per side of a field
 Areas.TILES = Areas.GRID * Areas.GRID -- tile numbers run from 1 to this
@@ -18,7 +27,6 @@ Areas.HOLE = 10
 Areas.TILE_COUNT = Areas.TILES - Areas.HOLE * Areas.HOLE -- grass tiles that really exist
 Areas.RESPAWN = 16 -- seconds for grass to regrow
 Areas.BOSS_OFFSET = Vector3.new(0, 0, 0) -- the centre of the island
-Areas.SELL_OFFSET = Vector3.new(-138, 0, -138)
 Areas.ARENA_RADIUS = 21
 -- Grass milestones: clear this many grass tiles in an area to earn each reward.
 -- These are the goals for area 1; every later area needs MILESTONE_GROWTH x more per area.
@@ -30,7 +38,7 @@ Areas.MILESTONE_CASH = { 150, 400, 900, 2500 } -- x grass value
 Areas.BOSS_ZONE = Areas.ARENA_RADIUS + 2 -- stepping this close to a boss opens the fight prompt
 -- The boss portal: a green circle in front of the castle gate in town. Standing on it opens
 -- the world boss menu: one boss the whole server fights together.
-Areas.PORTAL_POS = Vector3.new(0, 0, -172)
+Areas.PORTAL_POS = Vector3.new(0, 0, -214)
 Areas.PORTAL_RADIUS = 13
 Areas.FIGHT_RADIUS = 58 -- size of the fight arena
 Areas.FIGHT_ORIGIN = Vector3.new(0, 300, 5000) -- first arena; more are placed along +X
@@ -137,13 +145,20 @@ for c = 1, 2 do
 		Areas.CellMap[c .. "," .. r] = 0
 	end
 end
+local function cellCenter(cell)
+	return Vector3.new((cell[1] - 1.5) * Areas.PITCH, 0, (cell[2] - 1.5) * Areas.PITCH)
+end
 for i, def in ipairs(DEFS) do
 	local cell = RING[i]
 	def.id = i
 	def.cell = cell
-	def.center = Vector3.new((cell[1] - 1.5) * Areas.PITCH, 0, (cell[2] - 1.5) * Areas.PITCH)
+	def.center = cellCenter(cell)
 	def.terrain = TERRAIN[i] or "Grass"
-	def.landmarkPos = def.center + Areas.LANDMARK_OFFSET
+	-- which way the entrance faces: towards the previous area, or towards town for area 1
+	local from = (i == 1 and Vector3.zero or cellCenter(RING[i - 1])) - def.center
+	def.front = math.abs(from.X) > math.abs(from.Z) and Vector3.new(math.sign(from.X), 0, 0) or Vector3.new(0, 0, math.sign(from.Z))
+	def.side = Vector3.new(def.front.Z, 0, -def.front.X)
+	def.landmarkPos = def.center + def.front * Areas.LANDMARK_SPOT[1] + def.side * Areas.LANDMARK_SPOT[2]
 	def.grassHP = 5 * 5 ^ (i - 1) -- cutting difficulty
 	def.grassValue = 4 ^ (i - 1) -- cash per grass unit
 	def.boss.hp = def.grassHP * 120
@@ -154,7 +169,9 @@ for i, def in ipairs(DEFS) do
 	def.boss.speed = 11 + i -- walking speed in the arena (studs per second)
 	def.boss.tempo = math.max(2.4, 4.2 - 0.15 * i) -- seconds between attacks
 	def.bossPos = def.center + Areas.BOSS_OFFSET
-	def.sellPos = def.center + Areas.SELL_OFFSET
+	def.sellPos = def.center + def.front * Areas.SELL_SPOT[1] + def.side * Areas.SELL_SPOT[2]
+	-- where players arrive by teleport: on the entrance path, next to the sell pad
+	def.spawnPos = def.center + def.front * Areas.SELL_SPOT[1] + def.side * (Areas.SELL_SPOT[2] - 20)
 	Areas.List[i] = def
 	Areas.CellMap[cell[1] .. "," .. cell[2]] = i
 end
@@ -195,7 +212,7 @@ function Areas.teleportPos(areaId: number): Vector3
 	if not a then
 		return Vector3.new(0, 6, 26)
 	end
-	return a.sellPos + Vector3.new(9, 5, 9)
+	return a.spawnPos + Vector3.new(0, 5, 0)
 end
 
 -- Where a player is put back after a boss fight: just outside the boss's circle.

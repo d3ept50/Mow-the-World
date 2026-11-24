@@ -702,7 +702,7 @@ R.Settings = function(body)
 
 	-- codes: a text box and a Redeem button; the server checks the code and gives the reward
 	local r, icon = Menus.row(list, 86, "Codes", "Enter a code for rewards.")
-	r.LayoutOrder = 6
+	r.LayoutOrder = 7
 	Menus.iconText(icon, "🎁")
 	local box = new("TextBox", { Name = "Code", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -180, 0, 20), Size = UDim2.fromOffset(210, 46), BackgroundColor3 = T.bg, Font = Enum.Font.FredokaOne, TextSize = 17, TextColor3 = T.text, PlaceholderText = "Type code here", PlaceholderColor3 = T.dim, Text = "", ClearTextOnFocus = false, Parent = r }, { UI.corner(12), UI.stroke(T.card2, 2) })
 	local function redeem()

@@ -344,7 +344,6 @@ function Grass.init()
 		local folder = Instance.new("Folder")
 		folder.Name = tostring(areaId)
 		local st = { hp = table.create(TILES, a.grassHP), alive = table.create(TILES, true), parts = table.create(TILES), queue = {}, head = 1 }
-		local rng = Random.new(areaId)
 		local h, s, v = Style.color(a.grass):ToHSV()
 		for idx = 1, TILES do
 			if not Areas.tileExists(idx) then
@@ -352,7 +351,12 @@ function Grass.init()
 				continue
 			end
 			local pos = Areas.tilePos(areaId, idx)
-			local height = 1.3 + rng:NextNumber() * 0.9
+			-- Smooth noise instead of a random height and shade per tile, so the field reads as
+			-- one soft, gently rolling lawn with lighter and darker patches, not a checkerboard.
+			local col, row = (idx - 1) % GRID, (idx - 1) // GRID
+			local broad = math.clamp(math.noise(col * 0.16, row * 0.16, areaId * 7.31), -0.5, 0.5)
+			local fine = math.clamp(math.noise(col * 0.7 + 3.1, row * 0.7 + 1.7, areaId * 1.9), -0.5, 0.5)
+			local height = 1.6 + broad * 0.5 + fine * 0.12
 			local p = Instance.new("Part")
 			p.Name = tostring(idx)
 			p.Anchored = true
@@ -363,7 +367,7 @@ function Grass.init()
 			p.TopSurface = Enum.SurfaceType.Smooth
 			p.BottomSurface = Enum.SurfaceType.Smooth
 			p.Material = Style.material(Enum.Material.Grass)
-			p.Color = Color3.fromHSV(h, s, math.clamp(v * rng:NextNumber(0.86, 1.06), 0, 1))
+			p.Color = Color3.fromHSV((h + broad * 0.025) % 1, math.clamp(s * (1 - fine * 0.12), 0, 1), math.clamp(v * (0.97 + broad * 0.2 + fine * 0.05), 0, 1))
 			p.Size = Vector3.new(TILE, height, TILE)
 			p.Position = Vector3.new(pos.X, 0.2 + height / 2, pos.Z)
 			p.Parent = folder

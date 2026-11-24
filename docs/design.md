@@ -13,7 +13,9 @@ A Roblox mowing simulator built in Place3.rbxl (local, unpublished). Players cut
 
 **Untested:** vehicles, rebirth, bosses and balance from area 3 onward, multiplayer, mobile and console controls.
 
-**Possible polish:** grass is still flat 6-stud tiles; mower and vehicle models are basic parts.
+**Possible polish:** mower and vehicle models are basic parts.
+
+**Visual rework (24 Nov 2026), not yet tested in Studio:** new map layout, lawn-style grass, brighter lighting and a restyled HUD and menus (see Map and UI below). The terrain re-bakes on the first start because `LAYOUT_VERSION` changed.
 
 ## Core loop
 
@@ -27,15 +29,30 @@ A Roblox mowing simulator built in Place3.rbxl (local, unpublished). Players cut
 
 ## Map
 
-- An archipelago: a central town island (660 studs wide, `Areas.MARKET_HALF`) and twelve 400-stud area islands around it on a 4×4 grid. Area islands sit 520 studs apart with 120 studs of sea between them; the town is smaller than its cell, so its eight bridges are 250 studs long.
-- Wooden bridges join the marketplace to its neighbours and each area to the next. A locked gate (force field) stands at the far end of each bridge until the previous boss is beaten.
-- Each area has a 30×30 grass field (6-stud tiles) with a 10×10 hole in the middle: the boss plaza, a paved square with four glowing obelisks where the boss stands. No grass grows on the plaza (`Areas.tileExists`), so each area has 800 tiles.
+![Top-down map: the town in the middle, twelve area islands around it, the bridges and the locked gates (red)](map.png)
+
+- An archipelago on a 4×4 grid: a town island in the middle 2×2 block and twelve 360-stud area islands in a ring around it (`Areas.CELL`). Island centres are 470 studs apart (`Areas.PITCH`). The town is sized to reach as far as the islands around it (`Areas.MARKET_HALF` = 415), so every stretch of sea, and every bridge, is 110 studs (`Areas.GAP`).
+- **Bridges:** the town has one bridge on each side, turning like a pinwheel, to areas 1, 4, 7 and 10 (`Areas.TOWN_LINKS`). Every area has a bridge to the next one, and area 12 has one back to area 1, so the ring can be walked all the way round. A locked gate (force field) stands at the area end of each bridge until the previous boss is beaten. Each gate stores where its bridge starts (`From`), and the guide arrow uses the nearest one.
+- **Inside an area island** everything is placed relative to its entrance (`a.front`: the bridge from the previous area, or from town for area 1):
+  - a 30×30 grass field (6-stud tiles) in the middle, with a 10×10 hole for the boss plaza: a paved square with four glowing obelisks. No grass grows on the plaza (`Areas.tileExists`), so each area has 800 tiles.
+  - under the grass, a mown lawn in two-tone stripes that shows wherever grass has been cut
+  - a stone walk round the field with a lamp at each corner, and a path from every bridge to the walk
+  - the sell pad just inside the entrance, beside the path (`Areas.SELL_SPOT`); teleports land between the two (`a.spawnPos`)
+  - the landmark in the back corner, facing the field (`Areas.LANDMARK_SPOT`)
+  - themed props in groves with open ground between them, clear of the paths, sell pad and landmark
+- Grass height and shade come from smooth noise, so a field reads as one gently rolling lawn rather than a checkerboard.
 - There are no fences. Each area is ringed by its own edge (`EDGES` in WorldBuilder): rock cliffs whose colour, height, caps, lava cracks or crystals change with the theme, or high walls with battlements and towers. An invisible barrier inside the edge keeps players in; the only gaps are the bridges.
-- The marketplace is a paved cartoon town inside a 48-stud town wall with big round towers: the fountain, nine shops in a ring, four diagonal streets that each fork to two bridges, about a hundred pastel houses with bright roofs, trees in stone planters, lamps, benches and bunting. It has no NPCs, no signposts round the fountain and almost no grass.
+- The marketplace is a paved cartoon town inside a 48-stud town wall with big round towers: the fountain, nine shops in a ring, four streets that each lead to one bridge, up to 150 pastel houses with bright roofs, trees in stone planters, lamps, benches and bunting. It has no NPCs, no signposts round the fountain and almost no grass.
 - **World boss portal:** a glowing green circle in front of the castle gate (`Areas.PORTAL_POS`). Standing on it opens the world boss card (Start / Join the fight, or a timer while the boss rests).
 - A castle (`Scenery.castle`) stands at the north end of town, at the end of an avenue from the plaza. It is scenery only: an invisible wall all the way round keeps players out.
 - Terrain (islands, beaches, sea) is baked into the place file and only re-bakes when `LAYOUT_VERSION` in WorldBuilder changes. Smooth terrain renders 2 studs above the filled volume, so islands are filled to y = -2.3 and parts are built at y = 0.
 - Everything else is rebuilt by `WorldBuilder.build()` on every server start.
+
+## UI
+
+- Built in code from the pieces in `Client.UI`: the theme colours, glossy outlined buttons, dark rounded panels, pill-shaped progress bars and round icon badges. Changing them there restyles every menu.
+- **HUD:** currencies top left (with a + button that opens the shop), and under them the six menus that work anywhere in a 2×3 grid: Workers, Items, Teleport, Daily, Shop and Menu. The area name and the current objective sit in capsules at the top, active boosts on the right, and the grass progress and bag bars at the bottom, with the Ride button beside them.
+- **Menus** open in one window whose header takes the menu's colour; the world behind it is blurred. Everything else (Crates, Mowers, Bags, Rebirth, Diamonds, Awards, Settings) is behind the Menu button and at the shops in town.
 
 ## Areas
 
@@ -138,7 +155,7 @@ ReplicatedStorage
   Remotes/             Action (RemoteFunction); DataSync, Notify, GrassFx, Gain, Milestone, ChestFx, BossFx
 StarterPlayerScripts/Client
   Main, State          startup, local copy of player data
-  UI                   theme, buttons, bars, sounds, 3D previews
+  UI                   theme, buttons, panels, bars, badges, sounds, 3D previews
   Menus                HUD, notifications, menu framework
   Panels               contents of every menu, crate reveal
   World                gates, sky per area, animations, effects, worker followers
@@ -155,7 +172,7 @@ The UI is built in code (ScreenGui `MowUI`), so StarterGui is empty by design.
 
 ## Adding content
 
-- **New area:** append to `DEFS` in `Config.Areas`, give it a free cell in `RING` (widen the grid if needed), add a landmark function in `Scenery`, and bump `LAYOUT_VERSION` in WorldBuilder.
+- **New area:** append to `DEFS` in `Config.Areas`, give it a free cell in `RING` next to the previous area (widen the grid if needed), add a landmark function in `Scenery`, and bump `LAYOUT_VERSION` in WorldBuilder.
 - **Mowers, bags, vehicles:** append to the lists in `Config.Items`.
 - **Workers, crates:** add them in `Config.Workers`.
 - **Achievements, daily rewards, diamond shop, passes:** edit `Config.Game`.

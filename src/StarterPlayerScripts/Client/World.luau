@@ -699,23 +699,32 @@ local SHOP_PANEL = { Mowers = "Mowers", Bags = "Bags", Crates = "Crates", Vehicl
 local GUIDE_GREEN, GUIDE_RED = Color3.fromRGB(120, 255, 90), Color3.fromRGB(255, 70, 60)
 local guide = { model = nil, parts = nil, color = nil, greeted = false, route = nil, lastLook = 0 }
 
--- The gate into an area and the far end of the bridge that leads to it.
-local function findRoute(areaId)
+-- The gate into an area and the far end of the bridge that leads to it. Some areas can be
+-- reached over two bridges; this picks the one whose start is nearest to the player.
+local function findRoute(areaId, pos)
+	local best, bestD
 	for _, g in ipairs(CollectionService:GetTagged("Gate")) do
 		if g:GetAttribute("Area") == areaId then
-			-- the gate is thin along the bridge, and the bridge runs away from the area's centre
-			local gp, c = g.Position, Areas.List[areaId].center
-			local bridgeStart
-			local span = g:GetAttribute("Span") or Areas.GAP
-			if g.Size.X < g.Size.Z then
-				bridgeStart = V(gp.X + math.sign(gp.X - c.X) * span, 0, gp.Z)
-			else
-				bridgeStart = V(gp.X, 0, gp.Z + math.sign(gp.Z - c.Z) * span)
+			local gp = g.Position
+			local bridgeStart = g:GetAttribute("From")
+			if typeof(bridgeStart) ~= "Vector3" then
+				-- older servers: the gate is thin along the bridge, which runs away from the area's centre
+				local c = Areas.List[areaId].center
+				local span = g:GetAttribute("Span") or Areas.GAP
+				if g.Size.X < g.Size.Z then
+					bridgeStart = V(gp.X + math.sign(gp.X - c.X) * span, 0, gp.Z)
+				else
+					bridgeStart = V(gp.X, 0, gp.Z + math.sign(gp.Z - c.Z) * span)
+				end
 			end
-			return { area = areaId, gate = V(gp.X, 0, gp.Z), bridgeStart = bridgeStart }
+			local dist = (V(pos.X, 0, pos.Z) - V(bridgeStart.X, 0, bridgeStart.Z)).Magnitude
+			if not bestD or dist < bestD then
+				best = { area = areaId, gate = V(gp.X, 0, gp.Z), bridgeStart = V(bridgeStart.X, 0, bridgeStart.Z) }
+				bestD = dist
+			end
 		end
 	end
-	return nil
+	return best
 end
 
 local function startGuide()
@@ -770,9 +779,14 @@ local function farmTarget(pos, area, unlocked, t)
 	if area == best then
 		return nil
 	end
-	if (not guide.route or guide.route.area ~= best) and t - guide.lastLook > 1 then
+	-- look again every second: the nearest bridge changes as the player moves
+	if t - guide.lastLook > 1 then
 		guide.lastLook = t
-		guide.route = findRoute(best)
+		-- on a bridge (Area is -1) keep the route already chosen, so the arrow does not flip
+		local onBridge = (area == nil or area < 0) and guide.route and guide.route.area == best
+		if not onBridge then
+			guide.route = findRoute(best, pos)
+		end
 	end
 	local route = guide.route
 	if not route or route.area ~= best then

@@ -1,6 +1,6 @@
 -- HUD, notifications and the panel framework. Panel contents live in the Panels module.
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
 local RS = game:GetService("ReplicatedStorage")
 
 local Config = RS.Shared.Config
@@ -22,16 +22,18 @@ local refs = {}
 local current
 local renderQueued = false
 
--- Buttons that are always on screen: { icon, label, panel }.
+-- Buttons that are always on screen, two to a row: { icon, label, panel }.
+-- They are the menus that work anywhere; buying things happens at the shops in town.
 Menus.MENU = {
-	{ "👷", "Workers", "Workers" }, { "🧭", "Teleport", "Teleport" }, { "🎁", "Daily", "Daily" },
+	{ "👷", "Workers", "Workers" }, { "🧳", "Items", "Inventory" },
+	{ "🧭", "Teleport", "Teleport" }, { "🎁", "Daily", "Daily" },
 	{ "🛒", "Shop", "Robux" }, { "📋", "Menu", "More" },
 }
 -- Everything else lives behind the Menu button (and at the shops in the marketplace).
 Menus.MORE = {
 	{ "📦", "Crates", "Crates" }, { "✂️", "Mowers", "Mowers" }, { "🎒", "Bags", "Bags" },
 	{ "🔁", "Rebirth", "Rebirth" }, { "💎", "Diamonds", "Diamonds" },
-	{ "🏆", "Awards", "Achievements" }, { "🧳", "Items", "Inventory" }, { "⚙️", "Settings", "Settings" },
+	{ "🏆", "Awards", "Achievements" }, { "⚙️", "Settings", "Settings" },
 }
 
 local MENU_COLORS = {
@@ -44,9 +46,10 @@ Menus.COLORS = MENU_COLORS
 ---------------------------------------------------------------- notifications & banners
 -- While something fills the middle of the screen (the chest reel), messages move to the
 -- bottom edge so they can still be read and do not cover it.
+local NOTES_Y = 172 -- below the area name, the objective and the boss bar
 function Menus.toastsLow(on: boolean)
 	if refs.notes then
-		refs.notes.Position = on and UDim2.new(0.5, 0, 1, -118) or UDim2.new(0.5, 0, 0, 132)
+		refs.notes.Position = on and UDim2.new(0.5, 0, 1, -118) or UDim2.new(0.5, 0, 0, NOTES_Y)
 	end
 end
 
@@ -67,10 +70,12 @@ function Menus.notify(text: string, kind: string?)
 		kids[1]:Destroy()
 	end
 	refs.noteOrder = (refs.noteOrder or 0) + 1
-	local f = new("Frame", { Size = UDim2.new(1, 0, 0, big and 44 or 36), BackgroundColor3 = T.bg, BackgroundTransparency = 0.05, LayoutOrder = refs.noteOrder, Parent = holder }, { UI.corner(18), UI.stroke(color, 2.5), UI.gradient(0.35) })
+	local f = UI.panel({ Size = UDim2.new(1, 0, 0, big and 46 or 38), LayoutOrder = refs.noteOrder, Parent = holder }, color:Lerp(T.ink, 0.15), big and 23 or 19)
+	-- a coloured dot on the left says at a glance what kind of message it is
+	new("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 12, 0.5, 0), Size = UDim2.fromOffset(10, 10), BackgroundColor3 = color, BorderSizePixel = 0, Parent = f }, { UI.round() })
 	local pop = new("UIScale", { Scale = 0.6, Parent = f })
 	UI.tween(pop, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
-	new("TextLabel", { Text = text, Size = UDim2.new(1, -20, 1, -8), Position = UDim2.fromOffset(10, 4), BackgroundTransparency = 1, Font = Enum.Font.FredokaOne, TextColor3 = color, TextScaled = true, Parent = f }, { new("UITextSizeConstraint", { MaxTextSize = big and 21 or 17 }) })
+	new("TextLabel", { Text = text, Size = UDim2.new(1, -44, 1, -10), Position = UDim2.fromOffset(30, 5), BackgroundTransparency = 1, Font = UI.Font, TextColor3 = color:Lerp(T.text, 0.25), TextScaled = true, Parent = f }, { new("UITextSizeConstraint", { MaxTextSize = big and 21 or 17 }), new("UIStroke", { Color = T.ink, Thickness = 1.4, Transparency = 0.2 }) })
 	if kind == "bad" then
 		UI.sfx("error", 0.6, 0.3)
 	elseif kind == "good" then
@@ -90,11 +95,14 @@ function Menus.notify(text: string, kind: string?)
 end
 
 function Menus.banner(text: string, color: Color3?)
-	local label = UI.text({ Text = text, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.3), Size = UDim2.fromOffset(900, 80), TextSize = 54, TextXAlignment = CENTER, TextColor3 = color or T.gold, Outline = true, ZIndex = 40, Parent = root })
+	local label = UI.text({ Text = text, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.3), Size = UDim2.fromOffset(900, 80), TextSize = 56, TextXAlignment = CENTER, TextColor3 = color or T.gold, Outline = true, ZIndex = 40, Parent = root })
+	local outline = label:FindFirstChildOfClass("UIStroke")
+	outline.Thickness = 3.5
 	local sc = new("UIScale", { Scale = 0.2, Parent = label })
 	UI.tween(sc, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
 	task.delay(2.2, function()
 		UI.tween(label, 0.5, { TextTransparency = 1 })
+		UI.tween(outline, 0.5, { Transparency = 1 })
 		task.wait(0.55)
 		label:Destroy()
 	end)
@@ -148,6 +156,18 @@ function Menus.refresh()
 	end
 end
 
+-- The world behind an open menu is softly blurred.
+local function menuBlur(on: boolean)
+	local blur = Lighting:FindFirstChild("MenuBlur")
+	if not blur then
+		blur = Instance.new("BlurEffect")
+		blur.Name = "MenuBlur"
+		blur.Size = 0
+		blur.Parent = Lighting
+	end
+	UI.tween(blur, 0.2, { Size = on and 10 or 0 })
+end
+
 function Menus.open(name: string, ctx)
 	if current and current.name == name and not ctx then
 		Menus.close()
@@ -155,12 +175,16 @@ function Menus.open(name: string, ctx)
 	end
 	if not current then
 		UI.sfx("open")
+		menuBlur(true)
 	end
 	current = { name = name, ctx = ctx or {} }
 	modal.Visible = true
 	refs.backdrop.Visible = true
 	refs.modalShadow.Visible = true
-	refs.header.BackgroundColor3 = MENU_COLORS[name] or T.card2
+	local color = MENU_COLORS[name] or T.card2
+	refs.header.BackgroundColor3 = color:Lerp(Color3.new(1, 1, 1), 0.08)
+	refs.headerFill.BackgroundColor3 = refs.header.BackgroundColor3
+	refs.modalStroke.Color = color:Lerp(T.ink, 0.55)
 	refs.modalScale.Scale = 0.85
 	UI.tween(refs.modalScale, 0.18, { Scale = 1 }, Enum.EasingStyle.Back)
 	render()
@@ -169,6 +193,7 @@ end
 function Menus.close()
 	if current then
 		UI.sfx("close")
+		menuBlur(false)
 	end
 	current = nil
 	modal.Visible = false
@@ -195,21 +220,25 @@ end
 
 -- shared widgets for panels
 function Menus.scroller(parent, props)
-	local base = { Name = "Scroll", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 8, ScrollBarImageColor3 = T.dim, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y, Parent = parent }
+	local base = { Name = "Scroll", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 6, ScrollBarImageColor3 = T.card2:Lerp(T.text, 0.3), CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y, Parent = parent }
 	for k, v in pairs(props or {}) do
 		base[k] = v
 	end
 	local s = new("ScrollingFrame", base)
-	new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = s })
+	new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = s })
+	-- room for the outlines of the rows, which the scrolling frame would otherwise clip
+	new("UIPadding", { PaddingTop = UDim.new(0, 3), PaddingLeft = UDim.new(0, 3), PaddingBottom = UDim.new(0, 8), Parent = s })
 	return s
 end
 
 -- Standard item row: icon box on the left, title + subtitle, action button on the right.
 function Menus.row(parent, h: number, title: string, sub: string?, titleColor: Color3?)
-	local r = new("Frame", { Name = title, Size = UDim2.new(1, -12, 0, h), BackgroundColor3 = T.card, Parent = parent }, { UI.corner(14), UI.gradient(0.22), new("UIStroke", { Color = T.card2, Thickness = 1.5, Transparency = 0.2 }) })
-	local icon = new("Frame", { Name = "Icon", Position = UDim2.fromOffset(8, 8), Size = UDim2.fromOffset(70, 70), BackgroundColor3 = T.card2, Parent = r }, { UI.corner(12), new("UIStroke", { Color = T.ink, Thickness = 1.5, Transparency = 0.4 }) })
-	UI.text({ Name = "Title", Text = title, Position = UDim2.fromOffset(90, 8), Size = UDim2.new(1, -270, 0, 26), TextSize = 21, TextColor3 = titleColor or T.text, Parent = r })
-	local subLabel = UI.text({ Name = "Sub", Text = sub or "", Position = UDim2.fromOffset(90, 36), Size = UDim2.new(1, -270, 0, h - 44), TextSize = 14, Font = Enum.Font.GothamMedium, TextColor3 = T.dim, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, RichText = true, TextTruncate = Enum.TextTruncate.None, Parent = r })
+	local r = new("Frame", { Name = title, Size = UDim2.new(1, -14, 0, h), BackgroundColor3 = T.card, BorderSizePixel = 0, Parent = parent }, { UI.corner(16), UI.gradient(0.2), UI.stroke(T.ink, 2, 0.35) })
+	-- a thin bright line along the top edge catches the light
+	new("Frame", { Name = "Edge", Position = UDim2.fromOffset(14, 1), Size = UDim2.new(1, -28, 0, 2), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.88, BorderSizePixel = 0, Parent = r })
+	local icon = new("Frame", { Name = "Icon", Position = UDim2.fromOffset(8, 8), Size = UDim2.fromOffset(70, 70), BackgroundColor3 = T.card2, BorderSizePixel = 0, Parent = r }, { UI.corner(14), UI.gradient(0.3), UI.stroke(T.ink, 2, 0.25) })
+	UI.text({ Name = "Title", Text = title, Position = UDim2.fromOffset(90, 8), Size = UDim2.new(1, -270, 0, 26), TextSize = 21, TextColor3 = titleColor or T.text, Outline = true, Parent = r })
+	local subLabel = UI.text({ Name = "Sub", Text = sub or "", Position = UDim2.fromOffset(90, 36), Size = UDim2.new(1, -270, 0, h - 44), TextSize = 14, Font = UI.BodyFont, TextColor3 = T.dim, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, RichText = true, TextTruncate = Enum.TextTruncate.None, Parent = r })
 	return r, icon, subLabel
 end
 
@@ -218,6 +247,14 @@ function Menus.iconText(icon, emoji: string, color: Color3?)
 		icon.BackgroundColor3 = color
 	end
 	UI.text({ Text = emoji, Size = UDim2.fromScale(1, 1), TextXAlignment = CENTER, TextSize = 38, Parent = icon })
+	if color then
+		-- tinted icons get the same raised shading as buttons
+		local g = icon:FindFirstChildOfClass("UIGradient")
+		if g then
+			g:Destroy()
+		end
+		UI.gloss().Parent = icon
+	end
 end
 
 function Menus.rowButton(r, text: string, color: Color3, enabled: boolean, fn, y: number?, h: number?)
@@ -225,16 +262,24 @@ function Menus.rowButton(r, text: string, color: Color3, enabled: boolean, fn, y
 end
 
 ---------------------------------------------------------------- HUD widgets
-local function pill(parent, icon, color)
-	local f = new("Frame", { Size = UDim2.fromOffset(204, 42), BackgroundColor3 = T.bg, BackgroundTransparency = 0.05, Parent = parent }, { UI.corner(21), UI.stroke(color, 2.5), UI.gradient(0.4) })
-	new("Frame", { Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(34, 34), BackgroundColor3 = color, BackgroundTransparency = 0.72, Parent = f }, { UI.corner(17) })
-	UI.text({ Text = icon, Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(34, 34), TextXAlignment = CENTER, TextSize = 21, Parent = f })
-	return UI.text({ Position = UDim2.fromOffset(46, 0), Size = UDim2.new(1, -54, 1, 0), TextSize = 22, TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.2), Text = "0", Outline = true, Parent = f })
+-- A currency counter: a dark capsule with a round coloured badge sticking out on the left,
+-- and optionally a small "+" button on the right that opens the shop.
+local PILL_W, PILL_H = 222, 42
+local function pill(parent, order, icon, color, onPlus)
+	local holder = new("Frame", { Size = UDim2.fromOffset(PILL_W, PILL_H), BackgroundTransparency = 1, LayoutOrder = order, Parent = parent })
+	UI.panel({ Position = UDim2.fromOffset(16, 0), Size = UDim2.new(1, -16, 1, 0), Parent = holder }, nil, PILL_H / 2)
+	UI.badge({ AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.fromOffset(PILL_H + 8, PILL_H + 8), ZIndex = 2, Parent = holder }, icon, color, 24)
+	local label = UI.text({ Position = UDim2.fromOffset(PILL_H + 16, 0), Size = UDim2.new(1, -(PILL_H + 16) - (onPlus and 44 or 14), 1, 0), TextSize = 24, TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.35), Text = "0", Outline = true, ZIndex = 2, Parent = holder })
+	if onPlus then
+		UI.button({ Name = "Plus", Text = "+", BackgroundColor3 = T.green, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -7, 0.5, 0), Size = UDim2.fromOffset(30, 30), TextSize = 26, Corner = 15, ZIndex = 2, Parent = holder }, onPlus)
+	end
+	return label, holder
 end
 
+-- An active boost: a small capsule with its icon, name and time left.
 local function chip(parent, text, color)
-	local f = new("Frame", { Size = UDim2.fromOffset(210, 28), BackgroundColor3 = T.bg, BackgroundTransparency = 0.12, Parent = parent }, { UI.corner(14), UI.gradient(0.35), new("UIStroke", { Color = color or T.card2, Thickness = 1.5, Transparency = 0.45 }) })
-	UI.text({ Text = text, Position = UDim2.fromOffset(8, 0), Size = UDim2.new(1, -12, 1, 0), TextSize = 14, TextColor3 = color or T.text, Parent = f })
+	local f = UI.panel({ Size = UDim2.fromOffset(230, 32), BackgroundTransparency = 0.1, Parent = parent }, color:Lerp(T.ink, 0.3), 16)
+	UI.text({ Text = text, Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -20, 1, 0), TextSize = 16, TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.2), Outline = true, Parent = f })
 end
 
 ---------------------------------------------------------------- boss prompt, lobby and invites
@@ -388,57 +433,90 @@ local function answerInvite(accept: boolean)
 end
 
 ---------------------------------------------------------------- HUD
-local function buildHUD()
-	local cur = new("Frame", { Position = UDim2.fromOffset(12, 8), Size = UDim2.fromOffset(204, 140), BackgroundTransparency = 1, Parent = root }, { new("UIListLayout", { Padding = UDim.new(0, 7), SortOrder = Enum.SortOrder.LayoutOrder }) })
-	refs.cash = pill(cur, "💵", T.green)
-	refs.diamonds = pill(cur, "💎", T.cyan)
-	refs.rebirths = pill(cur, "🔁", T.purple)
-	refs.rebirthPill = refs.rebirths.Parent
+-- A capsule that grows to fit its text: the area name and the objective at the top.
+local function capsule(props, textSize: number, color: Color3)
+	local base = { AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = T.bg, BackgroundTransparency = 0.06, BorderSizePixel = 0 }
+	for k, v in pairs(props) do
+		base[k] = v
+	end
+	local f = new("Frame", base, {
+		UI.round(),
+		UI.gradient(0.3),
+		UI.padding(22, 0),
+		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center }),
+	})
+	local stroke = UI.stroke(color, 2.5)
+	stroke.Parent = f
+	new("UISizeConstraint", { MinSize = Vector2.new(160, 0), Parent = f })
+	local label = UI.text({ Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, TextSize = textSize, TextXAlignment = CENTER, TextTruncate = Enum.TextTruncate.None, TextColor3 = color, Outline = true, Parent = f })
+	return label, stroke, f
+end
 
-	-- one short column of buttons; everything else is behind "Menu"
-	local column = new("Frame", { Name = "Menu", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 12, 0.56, 0), Size = UDim2.fromOffset(66, #Menus.MENU * 72), BackgroundTransparency = 1, Parent = root }, { new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }) })
+local function buildHUD()
+	-- left column: currencies, then the menu buttons in two columns
+	local left = new("Frame", { Name = "Left", Position = UDim2.fromOffset(14, 12), Size = UDim2.fromOffset(PILL_W, 520), BackgroundTransparency = 1, Parent = root }, { new("UIListLayout", { Padding = UDim.new(0, 9), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	local function shop()
+		Menus.open("Robux")
+	end
+	refs.cash = pill(left, 1, "💵", T.green, shop)
+	refs.diamonds = pill(left, 2, "💎", T.cyan, shop)
+	refs.rebirths, refs.rebirthPill = pill(left, 3, "🔁", T.purple)
+
+	local TILE, GAP = 76, 10
+	local rows = math.ceil(#Menus.MENU / 2)
+	local grid = new("Frame", { Name = "Menu", LayoutOrder = 4, Size = UDim2.fromOffset(TILE * 2 + GAP, rows * (TILE + GAP) + 4), BackgroundTransparency = 1, Parent = left }, {
+		new("UIPadding", { PaddingTop = UDim.new(0, 6) }),
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(TILE, TILE), CellPadding = UDim2.fromOffset(GAP, GAP), SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
 	for i, m in ipairs(Menus.MENU) do
-		local b = UI.button({ Name = m[3], BackgroundColor3 = MENU_COLORS[m[3]] or T.card, LayoutOrder = i, Corner = 16, Size = UDim2.fromOffset(64, 64), Parent = column }, function()
+		local b = UI.button({ Name = m[3], BackgroundColor3 = MENU_COLORS[m[3]] or T.card, LayoutOrder = i, Corner = 18, Parent = grid }, function()
 			Menus.open(m[3])
 		end)
-		UI.text({ Text = m[1], Size = UDim2.new(1, 0, 0, 42), TextXAlignment = CENTER, TextSize = 28, ZIndex = 2, Parent = b })
-		UI.text({ Text = m[2], Position = UDim2.new(0, 0, 1, -22), Size = UDim2.new(1, 0, 0, 18), TextXAlignment = CENTER, TextSize = 12, Outline = true, ZIndex = 2, Parent = b })
+		UI.text({ Text = m[1], Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 40), TextXAlignment = CENTER, TextSize = 32, ZIndex = 2, Parent = b })
+		UI.text({ Text = m[2], Position = UDim2.new(0, 2, 1, -25), Size = UDim2.new(1, -4, 0, 18), TextXAlignment = CENTER, TextSize = 14, Outline = true, ZIndex = 2, Parent = b })
 		if m[3] == "Daily" then
-			refs.dailyBadge = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 4, 0, -4), Size = UDim2.fromOffset(16, 16), BackgroundColor3 = T.red, Visible = false, ZIndex = 3, Parent = b }, { UI.corner(8) })
+			refs.dailyBadge = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 6, 0, -6), Size = UDim2.fromOffset(22, 22), BackgroundColor3 = T.red, Visible = false, ZIndex = 3, Parent = b }, { UI.round(), UI.stroke(T.ink, 2) })
+			UI.text({ Text = "!", Size = UDim2.fromScale(1, 1), TextXAlignment = CENTER, TextSize = 16, ZIndex = 4, Parent = refs.dailyBadge })
 		end
 	end
 
-	local bottom = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -12), Size = UDim2.fromOffset(400, 64), BackgroundTransparency = 1, Parent = root })
-	refs.areaBar, refs.areaFill, refs.areaLabel = UI.bar({ Position = UDim2.fromOffset(0, 0), Size = UDim2.new(1, 0, 0, 28), Parent = bottom }, T.green)
-	refs.bagBar, refs.bagFill, refs.bagLabel = UI.bar({ Position = UDim2.fromOffset(0, 34), Size = UDim2.new(1, 0, 0, 30), Parent = bottom }, T.blue)
-	refs.ride = UI.button({ Text = "🚜\nRide", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0.5, 212, 1, -12), Size = UDim2.fromOffset(72, 64), TextSize = 16, BackgroundColor3 = T.blue, Visible = false, Parent = root }, function()
+	-- bottom: grass progress in this area, then the bag with its badge
+	local BAR_W = 480
+	local bottom = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -16), Size = UDim2.fromOffset(BAR_W, 68), BackgroundTransparency = 1, Parent = root })
+	refs.areaBar, refs.areaFill, refs.areaLabel = UI.bar({ Position = UDim2.fromOffset(34, 0), Size = UDim2.new(1, -34, 0, 24), Parent = bottom }, T.green)
+	refs.areaLabel.TextSize = 14
+	refs.bagBar, refs.bagFill, refs.bagLabel = UI.bar({ Position = UDim2.fromOffset(34, 32), Size = UDim2.new(1, -34, 0, 36), Parent = bottom }, T.blue)
+	refs.bagLabel.TextSize = 18
+	refs.bagBadge = UI.badge({ AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0, 50), Size = UDim2.fromOffset(52, 52), ZIndex = 3, Parent = bottom }, "🎒", T.blue, 26)
+	refs.ride = UI.button({ Text = "🚜\nRide", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0.5, BAR_W / 2 + 14, 1, -16), Size = UDim2.fromOffset(76, 68), TextSize = 17, Corner = 18, BackgroundColor3 = T.blue, Visible = false, Parent = root }, function()
 		State.action("ToggleRide")
 	end)
 	-- key hint badge on the corner of the Ride button
 	local key = new("Frame", { Name = "Key", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 6, 0, -6), Size = UDim2.fromOffset(24, 24), BackgroundColor3 = T.ink, ZIndex = 3, Parent = refs.ride }, { UI.corner(7), UI.stroke(T.text, 1.5) })
 	UI.text({ Text = Menus.RIDE_KEY.Name, Size = UDim2.fromScale(1, 1), TextXAlignment = CENTER, TextSize = 15, ZIndex = 4, Parent = key })
 
-	local top = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 6), Size = UDim2.fromOffset(520, 56), BackgroundTransparency = 1, Parent = root })
-	refs.area = UI.text({ Size = UDim2.new(1, 0, 0, 32), TextXAlignment = CENTER, TextSize = 30, Outline = true, Parent = top })
-	refs.objective = UI.text({ Position = UDim2.fromOffset(0, 32), Size = UDim2.new(1, 0, 0, 22), TextXAlignment = CENTER, TextSize = 16, TextColor3 = T.gold, Outline = true, Parent = top })
+	-- top: where you are, and what to do next
+	refs.area, refs.areaStroke = capsule({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(0, 44), Parent = root }, 26, T.text)
+	refs.objective, refs.objectiveStroke = capsule({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(0, 30), BackgroundTransparency = 0.18, Parent = root }, 16, T.gold)
+	refs.objectiveStroke.Color = T.gold:Lerp(T.ink, 0.45)
 
-	refs.boss = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 66), Size = UDim2.fromOffset(480, 60), BackgroundColor3 = T.bg, BackgroundTransparency = 0.05, Visible = false, Parent = root }, { UI.corner(16), UI.stroke(T.red, 2.5), UI.gradient(0.35) })
-	refs.bossName = UI.text({ Position = UDim2.fromOffset(12, 2), Size = UDim2.new(1, -24, 0, 24), TextSize = 19, Parent = refs.boss })
-	refs.bossTime = UI.text({ Position = UDim2.fromOffset(12, 2), Size = UDim2.new(1, -24, 0, 24), TextSize = 17, TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = T.gold, Parent = refs.boss })
-	refs.bossBar, refs.bossFill, refs.bossLabel = UI.bar({ Position = UDim2.fromOffset(10, 28), Size = UDim2.new(1, -20, 0, 24), Parent = refs.boss }, T.red)
-	UI.button({ Name = "Leave", Text = "🚪 Leave", BackgroundColor3 = T.grey, Position = UDim2.new(1, 10, 0, 8), Size = UDim2.fromOffset(92, 44), TextSize = 15, Parent = refs.boss }, function()
+	refs.boss = UI.panel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 102), Size = UDim2.fromOffset(480, 62), Visible = false, Parent = root }, T.red, 18)
+	refs.bossName = UI.text({ Position = UDim2.fromOffset(14, 3), Size = UDim2.new(1, -28, 0, 24), TextSize = 19, Outline = true, Parent = refs.boss })
+	refs.bossTime = UI.text({ Position = UDim2.fromOffset(14, 3), Size = UDim2.new(1, -28, 0, 24), TextSize = 17, TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = T.gold, Outline = true, Parent = refs.boss })
+	refs.bossBar, refs.bossFill, refs.bossLabel = UI.bar({ Position = UDim2.fromOffset(12, 30), Size = UDim2.new(1, -24, 0, 24), Parent = refs.boss }, T.red)
+	UI.button({ Name = "Leave", Text = "🚪 Leave", BackgroundColor3 = T.grey, Position = UDim2.new(1, 10, 0, 9), Size = UDim2.fromOffset(96, 44), TextSize = 15, Parent = refs.boss }, function()
 		State.action("BossLeave")
 	end)
 
 	-- active boosts only: worker details are in the Workers menu
-	refs.side = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(210, 120), BackgroundTransparency = 1, Parent = root }, { new("UIListLayout", { Padding = UDim.new(0, 4) }) })
+	refs.side = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 12), Size = UDim2.fromOffset(230, 160), BackgroundTransparency = 1, Parent = root }, { new("UIListLayout", { Padding = UDim.new(0, 6), HorizontalAlignment = Enum.HorizontalAlignment.Right }) })
 
-	refs.prompt = new("Frame", { Name = "BossPrompt", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -92), Size = UDim2.fromOffset(468, 156), BackgroundColor3 = T.bg, BackgroundTransparency = 0.03, Visible = false, ZIndex = 6, Parent = root }, { UI.corner(18), UI.stroke(T.red, 3), UI.gradient(0.3) })
+	refs.prompt = UI.panel({ Name = "BossPrompt", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -100), Size = UDim2.fromOffset(468, 156), BackgroundTransparency = 0.02, Visible = false, ZIndex = 6, Parent = root }, T.red, 20)
 	refs.promptScale = new("UIScale", { Parent = refs.prompt })
 
 	-- invites sit on the toast layer so an open menu never hides them
-	refs.invite = new("Frame", { Name = "BossInvite", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 300), Size = UDim2.fromOffset(440, 118), BackgroundColor3 = T.bg, BackgroundTransparency = 0.03, Visible = false, Parent = toastRoot }, { UI.corner(18), UI.stroke(T.blue, 3), UI.gradient(0.3) })
-	refs.inviteText = UI.text({ Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -28, 0, 44), TextSize = 17, TextXAlignment = CENTER, TextWrapped = true, TextTruncate = Enum.TextTruncate.None, Parent = refs.invite })
+	refs.invite = UI.panel({ Name = "BossInvite", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 300), Size = UDim2.fromOffset(440, 118), BackgroundTransparency = 0.02, Visible = false, Parent = toastRoot }, T.blue, 20)
+	refs.inviteText = UI.text({ Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -28, 0, 44), TextSize = 17, TextXAlignment = CENTER, TextWrapped = true, TextTruncate = Enum.TextTruncate.None, Outline = true, Parent = refs.invite })
 	refs.inviteJoin = UI.button({ Text = "✅ Join", BackgroundColor3 = T.green, Position = UDim2.fromOffset(14, 60), Size = UDim2.fromOffset(200, 46), TextSize = 17, Parent = refs.invite }, function()
 		answerInvite(true)
 	end)
@@ -446,7 +524,7 @@ local function buildHUD()
 		answerInvite(false)
 	end)
 
-	refs.notes = new("Frame", { Name = "Notes", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 132), Size = UDim2.fromOffset(560, 200), BackgroundTransparency = 1, Parent = toastRoot }, { new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	refs.notes = new("Frame", { Name = "Notes", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, NOTES_Y), Size = UDim2.fromOffset(560, 210), BackgroundTransparency = 1, Parent = toastRoot }, { new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }) })
 end
 
 local function refreshHUD()
@@ -461,6 +539,7 @@ local function refreshHUD()
 	local a = Areas.List[area]
 	refs.area.Text = a and a.name or (area == 0 and "🏪 Marketplace" or "🌉 Crossing the bridge")
 	refs.area.TextColor3 = a and a.grass:Lerp(Color3.new(1, 1, 1), 0.35) or T.text
+	refs.areaStroke.Color = a and a.grass:Lerp(T.ink, 0.2) or T.card2
 
 	local target = Areas.List[d.areasUnlocked]
 	local nextArea = Areas.List[d.areasUnlocked + 1]
@@ -499,7 +578,8 @@ local function refreshHUD()
 	local ratio = cap == math.huge and 0 or math.clamp(d.bagCount / cap, 0, 1)
 	refs.bagFill.Size = UDim2.fromScale(ratio, 1)
 	refs.bagFill.BackgroundColor3 = ratio >= 0.999 and T.red or T.blue
-	refs.bagLabel.Text = "🎒 " .. fmt(math.floor(d.bagCount)) .. " / " .. fmt(cap) .. (ratio >= 0.999 and "  FULL!" or "")
+	refs.bagBadge.BackgroundColor3 = ratio >= 0.999 and T.red or T.blue
+	refs.bagLabel.Text = fmt(math.floor(d.bagCount)) .. " / " .. fmt(cap) .. (ratio >= 0.999 and "   BAG FULL!" or "")
 
 	local hasVehicle = d.equippedVehicle ~= "" and State.ownsVehicle(d.equippedVehicle)
 	refs.ride.Visible = hasVehicle and fightId == 0
@@ -590,20 +670,27 @@ function Menus.init()
 
 	buildHUD()
 
-	refs.backdrop = new("TextButton", { Name = "Backdrop", Text = "", AutoButtonColor = false, Position = UDim2.fromOffset(0, -200), Size = UDim2.new(1, 0, 1, 400), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.5, BorderSizePixel = 0, Visible = false, ZIndex = 8, Parent = root })
+	refs.backdrop = new("TextButton", { Name = "Backdrop", Text = "", AutoButtonColor = false, Position = UDim2.fromOffset(0, -200), Size = UDim2.new(1, 0, 1, 400), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, BorderSizePixel = 0, Visible = false, ZIndex = 8, Parent = root })
 	refs.backdrop.Activated:Connect(function()
 		Menus.close()
 	end)
-	modal = new("Frame", { Name = "Modal", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(800, 510), BackgroundColor3 = T.bg, Visible = false, ZIndex = 10, Parent = root }, { UI.corner(22), UI.stroke(T.ink, 4) })
+	local HEADER, RADIUS = 64, 24
+	modal = new("Frame", { Name = "Modal", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(820, 530), BackgroundColor3 = T.bg, BorderSizePixel = 0, Visible = false, ZIndex = 10, Parent = root }, { UI.corner(RADIUS), UI.gradient(0.2) })
+	refs.modalStroke = UI.stroke(T.ink, 4)
+	refs.modalStroke.Parent = modal
 	refs.modalShadow = UI.shadow(modal, 10)
 	refs.modalScale = new("UIScale", { Parent = modal })
-	-- coloured header bar (colour follows the open menu)
-	refs.header = new("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = T.card2, BorderSizePixel = 0, Parent = modal }, { UI.corner(22), UI.gradient(0.38) })
-	new("Frame", { Name = "Square", Position = UDim2.new(0, 0, 1, -22), Size = UDim2.new(1, 0, 0, 22), BackgroundColor3 = T.bg, BorderSizePixel = 0, Parent = refs.header })
-	new("Frame", { Name = "Line", Position = UDim2.new(0, 0, 1, -24), Size = UDim2.new(1, 0, 0, 3), BackgroundColor3 = T.ink, BackgroundTransparency = 0.5, BorderSizePixel = 0, Parent = refs.header })
-	titleLabel = UI.text({ Position = UDim2.fromOffset(24, 2), Size = UDim2.new(1, -90, 0, 36), TextSize = 28, Outline = true, ZIndex = 2, Parent = modal })
-	UI.button({ Name = "Close", Text = "X", BackgroundColor3 = T.red, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, -8), Size = UDim2.fromOffset(46, 46), TextSize = 24, Corner = 23, ZIndex = 3, Parent = modal }, Menus.close)
-	body = new("Frame", { Name = "Body", Position = UDim2.fromOffset(14, 48), Size = UDim2.new(1, -28, 1, -60), BackgroundTransparency = 1, Parent = modal })
+	-- coloured header bar (colour follows the open menu). Its bottom corners are squared off
+	-- by a strip of the same colour whose shading carries on from the header's.
+	refs.header = new("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, HEADER), BackgroundColor3 = T.card2, BorderSizePixel = 0, Parent = modal }, { UI.corner(RADIUS), UI.gradient(0.3) })
+	local top = 1 - 0.3 * (HEADER - RADIUS) / HEADER
+	refs.headerFill = new("Frame", { Name = "Square", Position = UDim2.new(0, 0, 1, -RADIUS), Size = UDim2.new(1, 0, 0, RADIUS), BackgroundColor3 = T.card2, BorderSizePixel = 0, Parent = refs.header }, {
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(top, top, top), Color3.new(0.7, 0.7, 0.7)) }),
+	})
+	new("Frame", { Name = "Line", Position = UDim2.fromOffset(0, HEADER), Size = UDim2.new(1, 0, 0, 3), BackgroundColor3 = T.ink, BackgroundTransparency = 0.3, BorderSizePixel = 0, Parent = modal })
+	titleLabel = UI.text({ Position = UDim2.fromOffset(26, 0), Size = UDim2.new(1, -100, 0, HEADER), TextSize = 30, Outline = true, ZIndex = 2, Parent = modal })
+	UI.button({ Name = "Close", Text = "✕", BackgroundColor3 = T.red, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0, HEADER / 2), Size = UDim2.fromOffset(44, 44), TextSize = 22, Corner = 22, ZIndex = 3, Parent = modal }, Menus.close)
+	body = new("Frame", { Name = "Body", Position = UDim2.fromOffset(14, HEADER + 14), Size = UDim2.new(1, -28, 1, -(HEADER + 26)), BackgroundTransparency = 1, Parent = modal })
 
 	State.notify = Menus.notify
 	RS.Remotes.Notify.OnClientEvent:Connect(Menus.notify)
