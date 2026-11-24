@@ -428,126 +428,205 @@ end
 -- use the generic body below.
 local BOSS_BUILDERS = {}
 
--- A serrated dandelion leaf. cf is the leaf's base, with its length along cf's Y axis.
-local function dandelionLeaf(m, cf, L, W, color, rib, thick)
-	local mid = cf * CF(0, L / 2, 0)
-	P(m, V(W, L, thick), mid, color, "Grass")
-	P(m, V(W * 0.14, L * 0.94, thick * 1.3), mid, rib, "SmoothPlastic")
-	for k = 1, 3 do
-		local y = L * (k / 4) - L / 2
-		for _, sx in ipairs({ -1, 1 }) do
-			local tooth = W * (0.42 - k * 0.06)
-			P(m, V(tooth, tooth, thick), mid * CF(sx * W * 0.5, y, 0) * ANG(0, 0, rad(45)), color, "Grass")
+-- A wedge with the same defaults as P. Its sloped face looks towards -Z: the tall edge is at +Z.
+local function Wg(parent, size, cf, color, mat)
+	local p = Instance.new("WedgePart")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Massless = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Size = size
+	p.CFrame = cf
+	p.Color = Style.color(color)
+	p.Material = Style.material(mat and Enum.Material[mat] or Enum.Material.SmoothPlastic)
+	p.Parent = parent
+	return p
+end
+Models.Wg = Wg
+
+-- A flat triangle made of two wedges back to back. It lies in cf's YZ plane (thickness t
+-- along X), with its base of width w centred on cf and its point at cf * (0, h, 0).
+local function tri(m, cf, w, h, t, color, mat)
+	Wg(m, V(t, h, w / 2), cf * CF(0, h / 2, -w / 4), color, mat)
+	Wg(m, V(t, h, w / 2), cf * CF(0, h / 2, w / 4) * ANG(0, math.pi, 0), color, mat)
+end
+Models.tri = tri
+
+-- A thorn pointing along cf's Y axis: two triangles crossed, so it reads as a spike from every side.
+local function thorn(m, cf, w, h, color, mat)
+	tri(m, cf, w, h, w * 0.22, color, mat)
+	tri(m, cf * ANG(0, math.pi / 2, 0), w, h, w * 0.22, color, mat)
+end
+
+-- A pointed leaf growing from cf along its Y axis, flat in cf's XY plane (it faces along Z).
+local function leafBlade(m, cf, L, W, color, mat)
+	local wide = cf * ANG(0, math.pi / 2, 0) * CF(0, L * 0.3, 0)
+	tri(m, wide, W, L * 0.7, W * 0.12, color, mat)
+	tri(m, wide * ANG(math.pi, 0, 0), W, L * 0.3, W * 0.12, color, mat)
+end
+
+-- A vine wound round a limb: a spiral of short cylinders about cf's Y axis, radius r,
+-- from height y0 to y1 (in cf's space), making `turns` turns.
+local function vine(m, cf, r, y0, y1, turns, d, color, phase)
+	local steps = math.max(4, math.floor(turns * 7))
+	local prev
+	for i = 0, steps do
+		local t = i / steps
+		local a = phase + t * turns * math.pi * 2
+		local p = (cf * CF(math.cos(a) * r, y0 + (y1 - y0) * t, math.sin(a) * r)).Position
+		if prev then
+			local len = (p - prev).Magnitude
+			P(m, V(len + d * 0.6, d, d), CFrame.lookAt((p + prev) / 2, p) * ANG(0, rad(90), 0), color, "Wood", "Cylinder")
 		end
+		prev = p
 	end
-	P(m, V(W * 0.5, W * 0.5, thick), mid * CF(0, L / 2, 0) * ANG(0, 0, rad(45)), color, "Grass")
+end
+
+-- Repeatable "random" wobble, so hand-made models come out the same every time.
+local function jit(i: number, amp: number): number
+	return math.sin(i * 7.31 + 1.7) * amp
 end
 
 -- Dandelion Brute (area 1): see docs/models/dandelion_brute.md
 BOSS_BUILDERS[1] = function(m, B, S)
-	local stem, leafC, ribC = rgb(70, 160, 60), rgb(46, 120, 48), rgb(100, 180, 80)
-	local belly, petal, petal2 = rgb(130, 200, 90), rgb(255, 224, 70), rgb(255, 240, 120)
-	local centre, seedDot, roots = rgb(255, 190, 40), rgb(230, 150, 32), rgb(120, 84, 58)
-	local puffC, eye, ink = rgb(248, 248, 242), rgb(255, 60, 40), rgb(60, 30, 20)
+	local bark, bark2, vineC = rgb(74, 58, 42), rgb(96, 76, 54), rgb(107, 74, 46)
+	local moss, leafC, leafD = rgb(110, 122, 46), rgb(130, 142, 54), rgb(86, 98, 42)
+	local thornC, strip, strip2 = rgb(170, 162, 76), rgb(242, 236, 220), rgb(255, 252, 244)
+	local coreC, eyeC = rgb(30, 26, 20), rgb(255, 230, 80)
 	local function at(x, y, z)
 		return CF(x * S, y * S, z * S)
 	end
+	-- a slightly skewed block (size in S), for a rough, chiselled look
+	local n = 0
+	local function rough(size, cf, color, mat)
+		n += 1
+		return P(m, size * S, cf * ANG(jit(n, 0.07), jit(n + 0.5, 0.1), jit(n + 0.9, 0.07)), color, mat)
+	end
 
-	-- root feet with three toes each, on short stem legs
+	-- legs: wide stance, bark pillars on big feet, wound with vines
 	for _, sx in ipairs({ -1, 1 }) do
-		P(m, V(0.26 * S, 0.12 * S, 0.34 * S), at(sx * 0.2, 0.06, -0.04), roots, "Wood")
+		local hip = at(sx * 0.32, 0, 0) * ANG(0, rad(sx * -8), 0)
+		rough(V(0.44, 0.22, 0.52), hip * at(0, 0.11, -0.04), bark, "Wood")
+		rough(V(0.46, 0.06, 0.5), hip * at(0, 0.235, -0.04), moss, "Grass")
+		rough(V(0.36, 0.5, 0.36), hip * at(0, 0.46, 0), bark2, "Wood")
+		rough(V(0.3, 0.16, 0.12), hip * at(0, 0.64, -0.17), moss, "Grass")
+		rough(V(0.4, 0.42, 0.4), hip * at(0, 0.88, 0.02), bark, "Wood")
+		vine(m, hip, 0.24 * S, 0.22 * S, 1.02 * S, 1.6, 0.05 * S, vineC, sx)
+		for k = -1, 1, 2 do
+			leafBlade(m, hip * at(k * 0.1, 0.62, -0.2) * ANG(rad(-25), 0, rad(-k * 35)), 0.24 * S, 0.11 * S, leafC)
+		end
+		thorn(m, hip * at(sx * 0.2, 0.8, 0) * ANG(0, 0, rad(-sx * 70)), 0.08 * S, 0.16 * S, thornC)
+	end
+
+	-- hips and a skirt of 12 leaves hanging all the way round
+	rough(V(0.62, 0.26, 0.42), at(0, 1.04, 0), bark, "Wood")
+	for i = 0, 11 do
+		local cf = at(0, 1.12, 0) * ANG(0, rad(i * 30 + 15), 0) * CF(0, 0, 0.25 * S) * ANG(rad(155), 0, 0)
+		leafBlade(m, cf, 0.36 * S, 0.17 * S, i % 2 == 0 and leafC or leafD)
+	end
+
+	-- body: belly, a broad chest, moss on top, a vine round it and leaves at the collar
+	rough(V(0.52, 0.3, 0.4), at(0, 1.25, 0), bark2, "Wood")
+	rough(V(0.8, 0.46, 0.5), at(0, 1.52, 0.02), bark, "Wood")
+	rough(V(0.62, 0.08, 0.44), at(0, 1.77, 0.02), moss, "Grass")
+	vine(m, at(0, 0, 0.02), 0.37 * S, 1.24 * S, 1.66 * S, 1.2, 0.055 * S, vineC, 2)
+	for k = -3, 3 do
+		leafBlade(m, at(k * 0.1, 1.72, -0.22) * ANG(rad(-30), 0, rad(-k * 22)), 0.3 * S, 0.14 * S, k % 2 == 0 and leafC or leafD)
+	end
+	for k = -2, 2 do
+		leafBlade(m, at(k * 0.11, 1.36, -0.24) * ANG(rad(170), 0, rad(k * 18)), 0.26 * S, 0.13 * S, k % 2 == 0 and leafD or leafC)
+	end
+	rough(V(0.22, 0.16, 0.22), at(0, 1.84, 0), bark2, "Wood") -- neck
+
+	-- arms: mossy shoulders with thorns, then huge gauntlets and fists with claws
+	for _, sx in ipairs({ -1, 1 }) do
+		local sh = at(sx * 0.58, 1.68, 0.02)
+		rough(V(0.46, 0.42, 0.46), sh, bark, "Wood")
+		rough(V(0.44, 0.08, 0.44), sh * at(0, 0.22, 0), moss, "Grass")
+		for k = 0, 2 do
+			thorn(m, sh * at(sx * (0.08 + k * 0.06), 0.24, (k - 1) * 0.13) * ANG(rad((k - 1) * -20), 0, rad(-sx * (25 + k * 15))), 0.09 * S, 0.2 * S, thornC)
+		end
+		leafBlade(m, sh * at(sx * 0.2, 0.12, -0.18) * ANG(rad(-20), 0, rad(-sx * 50)), 0.3 * S, 0.14 * S, leafC)
+		leafBlade(m, sh * at(sx * 0.22, 0.1, 0.12) * ANG(rad(20), 0, rad(-sx * 65)), 0.28 * S, 0.13 * S, leafD)
+
+		rough(V(0.28, 0.5, 0.28), at(sx * 0.76, 1.38, 0.02) * ANG(0, 0, rad(sx * 14)), bark2, "Wood")
+		local gauntlet = at(sx * 0.92, 0.98, -0.02)
+		rough(V(0.48, 0.56, 0.48), gauntlet, bark, "Wood")
+		rough(V(0.5, 0.1, 0.5), gauntlet * at(0, 0.22, 0), moss, "Grass")
+		vine(m, gauntlet, 0.33 * S, -0.26 * S, 0.26 * S, 1.3, 0.06 * S, vineC, sx * 1.3)
+		for k = 0, 3 do
+			local z = k % 2 == 0 and -0.12 or 0.12
+			thorn(m, gauntlet * at(sx * 0.24, -0.18 + k * 0.13, z) * ANG(rad(z * -150), 0, rad(-sx * 80)), 0.1 * S, 0.24 * S, thornC)
+		end
+		leafBlade(m, gauntlet * at(sx * 0.1, -0.1, -0.25) * ANG(rad(165), 0, rad(sx * 20)), 0.26 * S, 0.13 * S, leafC)
+
+		local fist = at(sx * 0.97, 0.52, -0.06)
+		rough(V(0.54, 0.4, 0.56), fist, bark2, "Wood")
+		rough(V(0.56, 0.08, 0.58), fist * at(0, 0.19, 0), moss, "Grass")
 		for k = -1, 1 do
-			P(m, V(0.07 * S, 0.06 * S, 0.2 * S), at(sx * 0.2 + k * 0.08, 0.03, -0.24) * ANG(0, rad(k * -20), 0), roots, "Wood")
+			thorn(m, fist * at(k * 0.16, -0.1, -0.28) * ANG(rad(-150), 0, 0), 0.11 * S, 0.24 * S, thornC)
 		end
-		cyl(m, 0.22 * S, 0.15 * S, V(sx * 0.2 * S, 0.2 * S, 0), stem, "Grass")
-	end
-
-	-- round leafy body with a lighter belly
-	local body = P(m, V(0.82 * S, 0.82 * S, 0.82 * S), at(0, 0.62, 0), stem, "Grass", "Ball")
-	body.Name = "Body"
-	P(m, V(0.5 * S, 0.5 * S, 0.5 * S), at(0, 0.56, -0.2), belly, "Grass", "Ball")
-
-	-- collar of 8 leaves fanning up and out round the neck
-	for i = 0, 7 do
-		local cf = at(0, 0.98, 0) * ANG(0, rad(i * 45 + 22.5), 0) * CF(0, 0, 0.22 * S) * ANG(rad(55), 0, 0)
-		dandelionLeaf(m, cf, 0.32 * S, 0.13 * S, leafC, ribC, 0.04 * S)
-	end
-	cyl(m, 0.14 * S, 0.15 * S, V(0, 1.06 * S, 0), stem, "Grass")
-
-	-- the flower head: a seedy centre disc facing forward, 16 outer and 12 inner petals
-	local headY, headZ = 1.42, -0.04
-	local disc = at(0, headY, headZ) * ANG(0, rad(90), 0)
-	P(m, V(0.06 * S, 0.5 * S, 0.5 * S), disc * CF(-0.1 * S, 0, 0), leafC, "Grass", "Cylinder") -- green back
-	P(m, V(0.16 * S, 0.62 * S, 0.62 * S), disc, centre, "SmoothPlastic", "Cylinder")
-	local face = (headZ - 0.09) * S -- z of the front of the disc
-	for i = 0, 9 do
-		local a = rad(i * 36 + 18)
-		P(m, V(0.05 * S, 0.05 * S, 0.05 * S), CF(math.sin(a) * 0.25 * S, headY * S + math.cos(a) * 0.25 * S, face), seedDot, "SmoothPlastic", "Ball")
-	end
-	local function petals(count, L, W, startR, dz, tilt, offset, color)
-		for i = 0, count - 1 do
-			local cf = at(0, headY, headZ + dz) * ANG(0, 0, rad(i * 360 / count + offset)) * CF(0, startR * S + L * S / 2, 0) * ANG(rad(tilt), 0, 0)
-			P(m, V(W * S, L * S, 0.045 * S), cf, color, "SmoothPlastic")
+		for k = 0, 1 do
+			thorn(m, fist * at(sx * 0.27, -0.05 + k * 0.12, 0.05 - k * 0.12) * ANG(0, 0, rad(-sx * 85)), 0.09 * S, 0.18 * S, thornC)
 		end
 	end
-	petals(16, 0.36, 0.12, 0.27, 0.02, -10, 0, petal)
-	petals(12, 0.24, 0.1, 0.25, -0.03, -20, 15, petal2)
 
-	-- angry face: red glowing eyes, heavy brows, a jagged grin
-	local pupil
-	for _, sx in ipairs({ -1, 1 }) do
-		P(m, V(0.15 * S, 0.15 * S, 0.15 * S), CF(sx * 0.11 * S, (headY + 0.05) * S, face), Color3.new(1, 1, 1), "SmoothPlastic", "Ball")
-		pupil = P(m, V(0.07 * S, 0.07 * S, 0.07 * S), CF(sx * 0.1 * S, (headY + 0.045) * S, face - 0.06 * S), eye, "Neon", "Ball")
-		P(m, V(0.17 * S, 0.045 * S, 0.04 * S), CF(sx * 0.11 * S, (headY + 0.15) * S, face - 0.03 * S) * ANG(0, 0, rad(sx * 24)), ink)
-	end
-	glow(pupil, eye, S * 1.2)
-	P(m, V(0.26 * S, 0.07 * S, 0.03 * S), CF(0, (headY - 0.11) * S, face - 0.02 * S), ink)
-	for i, x in ipairs({ -0.09, -0.03, 0.03, 0.09 }) do
-		local y = i % 2 == 0 and headY - 0.09 or headY - 0.13
-		P(m, V(0.045 * S, 0.05 * S, 0.03 * S), CF(x * S, y * S, face - 0.035 * S), Color3.new(1, 1, 1))
-	end
-
-	-- arms: leafy shoulder guards, stem arms, round fists
-	local fists = {}
-	for _, sx in ipairs({ -1, 1 }) do
-		P(m, V(0.3 * S, 0.3 * S, 0.3 * S), at(sx * 0.46, 0.86, 0), leafC, "Grass", "Ball")
-		dandelionLeaf(m, at(sx * 0.46, 0.95, 0) * ANG(0, 0, rad(-sx * 60)), 0.3 * S, 0.14 * S, leafC, ribC, 0.04 * S)
-		P(m, V(0.17 * S, 0.4 * S, 0.17 * S), at(sx * 0.56, 0.66, -0.02) * ANG(0, 0, rad(sx * 20)), stem, "Grass")
-		fists[sx] = at(sx * 0.63, 0.45, -0.04)
-		P(m, V(0.26 * S, 0.26 * S, 0.26 * S), fists[sx], leafC, "Grass", "Ball")
-	end
-	-- left hand: three leaves hanging down like claws
-	for k = -1, 1 do
-		dandelionLeaf(m, fists[-1] * ANG(0, 0, rad(k * 25)) * ANG(rad(180), 0, 0) * CF(0, 0.08 * S, 0), 0.3 * S, 0.12 * S, leafC, ribC, 0.035 * S)
-	end
-	-- right hand: the seed-puff club, tilted outwards, with 14 seed spikes
-	local tilt = fists[1] * ANG(0, 0, rad(-15))
-	P(m, V(0.8 * S, 0.07 * S, 0.07 * S), tilt * CF(0, 0.4 * S, 0) * ANG(0, 0, rad(90)), stem, "Grass", "Cylinder")
-	local centrePos = (tilt * CF(0, 0.88 * S, 0)).Position
-	local puff = P(m, V(0.46 * S, 0.46 * S, 0.46 * S), CF(centrePos), puffC, "SmoothPlastic", "Ball")
-	puff.Transparency = 0.15
-	P(m, V(0.16 * S, 0.16 * S, 0.16 * S), CF(centrePos), rgb(220, 200, 150), "SmoothPlastic", "Ball")
-	local n = 14
-	for i = 0, n - 1 do
-		-- spread evenly over a sphere (golden angle spiral)
-		local y = 1 - 2 * (i + 0.5) / n
-		local r = math.sqrt(1 - y * y)
+	-- the head: a white seed-head of radiating strips round a dark core. The front is left
+	-- open so the core shows, with two glowing yellow slit eyes in it.
+	local hc = at(0, 2.14, -0.02)
+	local headPos = hc.Position
+	local core = P(m, V(0.38 * S, 0.38 * S, 0.38 * S), hc, coreC, "SmoothPlastic", "Ball")
+	core.Name = "Body"
+	local count = 100
+	for i = 0, count - 1 do
+		-- spread over a sphere round the forward axis, then squashed front to back so the
+		-- strips fan out sideways like a sunburst and the head looks big from the front
+		local zc = 1 - 2 * (i + 0.5) / count
+		local r = math.sqrt(1 - zc * zc)
 		local a = i * 2.39996
-		local dir = V(math.cos(a) * r, y, math.sin(a) * r)
-		local base = CFrame.lookAt(centrePos, centrePos + dir)
-		P(m, V(0.02 * S, 0.2 * S, 0.02 * S), base * CF(0, 0, -0.27 * S) * ANG(rad(-90), 0, 0), puffC)
-		P(m, V(0.06 * S, 0.06 * S, 0.06 * S), base * CF(0, 0, -0.38 * S), puffC, "Neon", "Ball")
+		local dir = V(math.cos(a) * r, math.sin(a) * r, zc * 0.55).Unit
+		if dir.Z > -0.6 then
+			local L = (dir.Z < -0.4 and 0.28 or (0.44 + jit(i * 3.1, 0.06))) * S
+			local W = (0.1 + jit(i * 1.7, 0.02)) * S
+			local base = CFrame.lookAt(headPos, headPos + dir) * ANG(0, 0, jit(i, 1.5))
+			P(m, V(W, L, 0.018 * S), base * CF(0, 0, -(0.15 * S + L / 2)) * ANG(rad(-90), 0, 0), i % 3 == 0 and strip2 or strip, "SmoothPlastic")
+		end
 	end
-	glow(puff, puffC, S * 1.6, 5)
-	local seeds = puff:FindFirstChildOfClass("ParticleEmitter")
-	if seeds then
-		-- seeds drift off slowly and float upwards
-		seeds.Speed = NumberRange.new(0.5, 1.5)
-		seeds.Acceleration = V(0, 1.5, 0)
-		seeds.Lifetime = NumberRange.new(2, 3.5)
-		seeds.Drag = 1
+	local eye
+	for _, sx in ipairs({ -1, 1 }) do
+		eye = P(m, V(0.15 * S, 0.05 * S, 0.03 * S), hc * at(sx * 0.08, 0.02, -0.185) * ANG(0, 0, rad(sx * 22)), eyeC, "Neon")
+		P(m, V(0.07 * S, 0.03 * S, 0.03 * S), hc * at(sx * 0.095, -0.014, -0.18) * ANG(0, 0, rad(sx * -10)), eyeC, "Neon")
 	end
-	return body
+	glow(eye, eyeC, S * 1.4)
+
+	-- seeds floating round the head and shoulders, and more drifting away
+	local spots = { { -1.05, 2.2, 0.1 }, { 1.08, 2.3, 0.05 }, { -1.22, 1.55, -0.1 }, { 1.26, 1.6, -0.05 }, { -0.8, 2.75, 0.2 }, { 0.85, 2.7, 0.15 } }
+	for i, sp in ipairs(spots) do
+		local c = at(sp[1], sp[2], sp[3]) * ANG(jit(i, 0.5), jit(i + 2, 3), jit(i + 4, 0.6))
+		P(m, V(0.012 * S, 0.14 * S, 0.012 * S), c, strip)
+		P(m, V(0.035 * S, 0.035 * S, 0.035 * S), c * CF(0, -0.075 * S, 0), vineC, nil, "Ball")
+		for k = 0, 5 do
+			P(m, V(0.008 * S, 0.08 * S, 0.008 * S), c * CF(0, 0.07 * S, 0) * ANG(0, rad(k * 60), 0) * ANG(rad(70), 0, 0) * CF(0, 0.04 * S, 0), strip2, "Neon")
+		end
+	end
+	local drift = Instance.new("ParticleEmitter")
+	drift.Color = ColorSequence.new(strip2)
+	drift.Rate = 4
+	drift.Lifetime = NumberRange.new(3, 5)
+	drift.Speed = NumberRange.new(1, 2.5)
+	drift.SpreadAngle = Vector2.new(180, 180)
+	drift.Acceleration = V(0, 1.2, 0)
+	drift.Drag = 0.8
+	drift.RotSpeed = NumberRange.new(-40, 40)
+	drift.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0.12) })
+	drift.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+	drift.LightEmission = 0.6
+	drift.Parent = core
+	return core
 end
 
 function Models.boss(areaId: number): Model
